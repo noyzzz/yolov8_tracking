@@ -38,7 +38,7 @@ def create_tracker(tracker_type, tracker_config, reid_weights, device, half):
         return ocsort
     
     elif tracker_type == 'bytetrack':
-        from trackers.bytetrack.byte_tracker import BYTETracker
+        from trackers.bytetrack.my_byte_tracker import BYTETracker
         bytetracker = BYTETracker(
             track_thresh=cfg.bytetrack.track_thresh,
             match_thresh=cfg.bytetrack.match_thresh,

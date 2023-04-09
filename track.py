@@ -219,7 +219,10 @@ def run(
 
                 # pass detections to strongsort
                 with dt[3]:
+                    # cv2.imshow("kir", im0)
+                    # print(len(det))
                     outputs[i] = tracker_list[i].update(det.cpu(), im0)
+                    # print("outputs[0]          ",outputs[0])
                 
                 # draw boxes for visualization
                 if len(outputs[i]) > 0:
