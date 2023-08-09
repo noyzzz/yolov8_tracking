@@ -10,6 +10,9 @@ import cv2
 import torch
 import torchvision
 
+import sys,os
+#sys.path.append(os.path.dirname(__file__))
+
 import numpy as np
 from .association import *
 from .embedding import EmbeddingComputer

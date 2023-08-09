@@ -1,6 +1,21 @@
+#!/usr/bin/env python3.8
 import argparse
+import copy
+import queue
+import threading
+import time
 import cv2
 import os
+import roslib
+import sys
+import rospy
+from std_msgs.msg import String
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge, CvBridgeError
+#add .. to path
+# sys.path.append("/home/rosen/tracking_catkin_ws/src/my_tracker")
+print(sys.path)
+# from my_tracker.msg import ImageDetectionMessage
 # limit the number of cpus used by high performance libraries
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
@@ -40,7 +55,7 @@ from yolov8.ultralytics.yolo.utils.ops import Profile, non_max_suppression, scal
 from yolov8.ultralytics.yolo.utils.plotting import Annotator, colors, save_one_box
 
 from trackers.multi_tracker_zoo import create_tracker
-
+from ros_classes import image_converter
 
 @torch.no_grad()
 def run(
@@ -53,7 +68,7 @@ def run(
         conf_thres=0.25,  # confidence threshold
         iou_thres=0.45,  # NMS IOU threshold
         max_det=1000,  # maximum detections per image
-        device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
+        device='0',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
         show_vid=False,  # show results
         save_txt=False,  # save results to *.txt
         save_conf=False,  # save confidences in --save-txt labels
@@ -77,13 +92,17 @@ def run(
         dnn=False,  # use OpenCV DNN for ONNX inference
         vid_stride=1,  # video frame-rate stride
         retina_masks=False,
+        ros_package = 0
 ):
-
+    is_ros = isinstance(source, image_converter)
+    #copy source to avoid changing the original
+    source_copy = copy.copy(source)
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
     is_file = Path(source).suffix[1:] in (VID_FORMATS)
     is_url = source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://'))
-    webcam = source.isnumeric() or source.endswith('.txt') or (is_url and not is_file)
+    #check if source is instance of ros_classes.image_converter
+    webcam = source.isnumeric() or source.endswith('.txt') or (is_url and not is_file) or is_ros
     if is_url and is_file:
         source = check_file(source)  # download
 
@@ -109,14 +128,24 @@ def run(
     bs = 1
     if webcam:
         show_vid = check_imshow(warn=True)
-        dataset = LoadStreams(
-            source,
+        if is_ros:
+            dataset = LoadStreams(
+            source_copy,
             imgsz=imgsz,
             stride=stride,
             auto=pt,
             transforms=getattr(model.model, 'transforms', None),
             vid_stride=vid_stride
         )
+        else:
+            dataset = LoadStreams(
+                source,
+                imgsz=imgsz,
+                stride=stride,
+                auto=pt,
+                transforms=getattr(model.model, 'transforms', None),
+                vid_stride=vid_stride
+            )
         bs = len(dataset)
     else:
         dataset = LoadImages(
@@ -145,7 +174,13 @@ def run(
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile(), Profile())
     curr_frames, prev_frames = [None] * bs, [None] * bs
     for frame_idx, batch in enumerate(dataset):
-        path, im, im0s, vid_cap, s = batch
+        #if is ros node 
+        if is_ros:
+            path, im, im0s, vid_cap, s, extra_output = batch
+        else:
+            path, im, im0s, vid_cap, s = batch
+
+
         visualize = increment_path(save_dir / Path(path[0]).stem, mkdir=True) if visualize else False
         with dt[0]:
             im = torch.from_numpy(im).to(device)
@@ -156,8 +191,14 @@ def run(
 
         # Inference
         with dt[1]:
+            time1 = round(time.time() * 1000)
+            # print(im.shape)
+            # create a pytorch random tensor with size of 1,3,192,320
+            my_tensor = torch.rand(1, 3, 192, 320,device=device)
+            #change my_tensor to im
             preds = model(im, augment=augment, visualize=visualize)
-
+            time2 = round(time.time() * 1000)
+            # print("inference time", time2 - time1)
         # Apply NMS
         with dt[2]:
             if is_seg:
@@ -172,10 +213,11 @@ def run(
             seen += 1
             if webcam:  # bs >= 1
                 p, im0, _ = path[i], im0s[i].copy(), dataset.count
-                p = Path(p)  # to Path
-                s += f'{i}: '
-                txt_file_name = p.name
-                save_path = str(save_dir / p.name)  # im.jpg, vid.mp4, ...
+                if not is_ros:
+                    p = Path(p)  # to Path
+                    s += f'{i}: '
+                    txt_file_name = p.name
+                    save_path = str(save_dir / p.name)  # im.jpg, vid.mp4, ...
             else:
                 p, im0, _ = path, im0s.copy(), getattr(dataset, 'frame', 0)
                 p = Path(p)  # to Path
@@ -188,8 +230,8 @@ def run(
                     txt_file_name = p.parent.name  # get folder name containing current img
                     save_path = str(save_dir / p.parent.name)  # im.jpg, vid.mp4, ...
             curr_frames[i] = im0
-
-            txt_path = str(save_dir / 'tracks' / txt_file_name)  # im.txt
+            if not is_ros:
+                txt_path = str(save_dir / 'tracks' / txt_file_name)  # im.txt
             s += '%gx%g ' % im.shape[2:]  # print string
             imc = im0.copy() if save_crop else im0  # for save_crop
 
@@ -219,10 +261,33 @@ def run(
 
                 # pass detections to strongsort
                 with dt[3]:
-                    # cv2.imshow("kir", im0)
-                    # print(len(det))
-                    outputs[i] = tracker_list[i].update(det.cpu(), im0)
-                    # print("outputs[0]          ",outputs[0])
+                    #if is ros node and reset_simulation_signal is true reset simulation
+                    if is_ros and extra_output["reset_signal"]:
+                        print("reset simulation*********************")
+                        tracker_list = []
+                        for i in range(bs):
+                            tracker = create_tracker(tracking_method, tracking_config, reid_weights, device, half)
+                            tracker_list.append(tracker, )
+                            if hasattr(tracker_list[i], 'model'):
+                                if hasattr(tracker_list[i].model, 'warmup'):
+                                    tracker_list[i].model.warmup()
+                        outputs = [None] * bs
+                    depth_image = extra_output["depth_image"]
+                    odom = extra_output["odom"]
+                    outputs[i] = None
+                    if tracker_list[i].use_depth and tracker_list[i].use_odometry:
+                        outputs[i] = tracker_list[i].update(det.cpu(), im0, depth_image, odom, masks[i])
+                    else:
+                        outputs[i] = tracker_list[i].update(det.cpu(), im0)
+
+                    #what is each det element? [x1, y1, x2, y2, conf, cls, cls_conf]
+                    # outputs[i] =  tracker_list[i].update(det.cpu(), im0)
+
+
+
+
+
+
                 
                 # draw boxes for visualization
                 if len(outputs[i]) > 0:
@@ -275,6 +340,29 @@ def run(
                 
             # Stream results
             im0 = annotator.result()
+            if ros_package == "1": #it means that the image_detection message type is being generated and published
+                from my_tracker.msg import ImageDetectionMessage
+                im0_flatten = im0.flatten().tolist()
+                im0_height = im0.shape[0]
+                im0_width = im0.shape[1]
+                image_detection_message = ImageDetectionMessage()
+                image_detection_message.im_width = im0_width
+                image_detection_message.im_height = im0_height
+                image_detection_message.im_data = im0_flatten
+                if outputs[0] is not None and len(outputs[0]) > 0:
+                    outputs[0] = np.array(outputs[0])
+                    tracks_object_bbs = outputs[0][:,:5] #track_id_size x (x1, y1, x2, y2, track_id)
+                    tracks_flatten = tracks_object_bbs.flatten().tolist()
+                    tracks_height = tracks_object_bbs.shape[0]
+                    tracks_width = tracks_object_bbs.shape[1]
+                    image_detection_message.tracks_width = tracks_width
+                    image_detection_message.tracks_height = tracks_height
+                    image_detection_message.tracks_data = tracks_flatten
+                else:
+                    image_detection_message.tracks_width = 0
+                    image_detection_message.tracks_height = 0
+                    image_detection_message.tracks_data = []
+                source_copy.track_publisher.publish(image_detection_message)
             if show_vid:
                 if platform.system() == 'Linux' and p not in windows:
                     windows.append(p)
@@ -306,11 +394,11 @@ def run(
         LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{sum([dt.dt for dt in dt if hasattr(dt, 'dt')]) * 1E3:.1f}ms")
 
     # Print results
-    t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
-    LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS, %.1fms {tracking_method} update per image at shape {(1, 3, *imgsz)}' % t)
-    if save_txt or save_vid:
-        s = f"\n{len(list((save_dir / 'tracks').glob('*.txt')))} tracks saved to {save_dir / 'tracks'}" if save_txt else ''
-        LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
+    # t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
+    # LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS, %.1fms {tracking_method} update per image at shape {(1, 3, *imgsz)}' % t)
+    # if save_txt or save_vid:
+    #     s = f"\n{len(list((save_dir / 'tracks').glob('*.txt')))} tracks saved to {save_dir / 'tracks'}" if save_txt else ''
+    #     LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
     if update:
         strip_optimizer(yolo_weights)  # update model (to fix SourceChangeWarning)
 
@@ -326,7 +414,7 @@ def parse_opt():
     parser.add_argument('--conf-thres', type=float, default=0.5, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.5, help='NMS IoU threshold')
     parser.add_argument('--max-det', type=int, default=1000, help='maximum detections per image')
-    parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+    parser.add_argument('--device', default='0', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--show-vid', action='store_true', help='display tracking video results')
     parser.add_argument('--save-txt', action='store_true', help='save results to *.txt')
     parser.add_argument('--save-conf', action='store_true', help='save confidences in --save-txt labels')
@@ -351,6 +439,7 @@ def parse_opt():
     parser.add_argument('--dnn', action='store_true', help='use OpenCV DNN for ONNX inference')
     parser.add_argument('--vid-stride', type=int, default=1, help='video frame-rate stride')
     parser.add_argument('--retina-masks', action='store_true', help='whether to plot masks in native resolution')
+    parser.add_argument('--ros-package', type=str, default='0', help='is this running in a ros package')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     opt.tracking_config = ROOT / 'trackers' / opt.tracking_method / 'configs' / (opt.tracking_method + '.yaml')
@@ -358,11 +447,24 @@ def parse_opt():
     return opt
 
 
+def ros_init(is_ros_package=0):
+    ic = image_converter(is_ros_package)
+    rospy.init_node('image_converter', anonymous=True)
+    return ic
+    # try:
+    #     rospy.spin()
+    # except KeyboardInterrupt:
+    #     print("Shutting down")
+    # cv2.destroyAllWindows()
+
 def main(opt):
     check_requirements(requirements=ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
+    ic = ros_init(int(opt.ros_package))
+    opt.source = ic
     run(**vars(opt))
 
 
-if __name__ == "__main__":
-    opt = parse_opt()
-    main(opt)
+
+# if __name__ == "__main__":
+#     opt = parse_opt()
+#     main(opt)

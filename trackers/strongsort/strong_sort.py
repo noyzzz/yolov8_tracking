@@ -38,6 +38,13 @@ class StrongSORT(object):
         self.tracker = Tracker(
             metric, max_iou_dist=max_iou_dist, max_age=max_age, n_init=n_init, max_unmatched_preds=max_unmatched_preds, mc_lambda=mc_lambda, ema_alpha=ema_alpha)
 
+
+
+    def reset_tracker(self):
+        self.tracker = Tracker(
+            self.tracker.metric, max_iou_dist=self.tracker.max_iou_dist, max_age=self.tracker.max_age, n_init=self.tracker.n_init, max_unmatched_preds=self.tracker.max_unmatched_preds, mc_lambda=self.tracker.mc_lambda, ema_alpha=self.tracker.ema_alpha)
+        
+        
     def update(self, dets,  ori_img):
         
         xyxys = dets[:, 0:4]

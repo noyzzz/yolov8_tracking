@@ -1,10 +1,11 @@
 from trackers.strongsort.utils.parser import get_config
 
 def create_tracker(tracker_type, tracker_config, reid_weights, device, half):
-    
-    cfg = get_config()
-    cfg.merge_from_file(tracker_config)
-    
+    try:
+        cfg = get_config()
+        cfg.merge_from_file(tracker_config)
+    except:
+        print('No such config file')    
     if tracker_type == 'strongsort':
         from trackers.strongsort.strong_sort import StrongSORT
         strongsort = StrongSORT(
@@ -38,12 +39,18 @@ def create_tracker(tracker_type, tracker_config, reid_weights, device, half):
         return ocsort
     
     elif tracker_type == 'bytetrack':
-        from trackers.bytetrack.my_byte_tracker import BYTETracker
+        from trackers.bytetrack.byte_tracker import BYTETracker
         bytetracker = BYTETracker(
             track_thresh=cfg.bytetrack.track_thresh,
             match_thresh=cfg.bytetrack.match_thresh,
             track_buffer=cfg.bytetrack.track_buffer,
             frame_rate=cfg.bytetrack.frame_rate
+        )
+        return bytetracker
+    
+    elif tracker_type == 'unsvstrack':
+        from trackers.unsvstracker.unsvs_tracker import UnsVSTrack
+        bytetracker = UnsVSTrack(
         )
         return bytetracker
     
