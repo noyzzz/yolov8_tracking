@@ -14,7 +14,7 @@ from trackers.bytetrack import matching
 from trackers.bytetrack.basetrack import BaseTrack, TrackState
 
 class STrack(BaseTrack):
-    shared_kalman = KalmanFilter()
+    shared_kalman = KalmanFilter() #TODO check the parameters
     def __init__(self, tlwh, score, cls):
 
         # wait activate
@@ -26,6 +26,7 @@ class STrack(BaseTrack):
         self.score = score
         self.tracklet_len = 0
         self.cls = cls
+
 
     def predict(self):
         mean_state = self.mean.copy()
@@ -87,7 +88,7 @@ class STrack(BaseTrack):
 
         new_tlwh = new_track.tlwh
         self.mean, self.covariance = self.kalman_filter.update(
-            self.mean, self.covariance, self.tlwh_to_xyah(new_tlwh))
+            self.mean, self.covariance, self.tlwh_to_xyah(new_tlwh)) #TODO define the update function for cases when we have odometry and depth
         self.state = TrackState.Tracked
         self.is_activated = True
 
@@ -162,9 +163,11 @@ class BYTETracker(object):
         self.det_thresh = track_thresh + 0.1
         self.buffer_size = int(frame_rate / 30.0 * track_buffer)
         self.max_time_lost = self.buffer_size
-        self.kalman_filter = KalmanFilter()
+        self.kalman_filter = KalmanFilter() #TODO check the parameters
+        self.use_depth = True
+        self.use_odometry = True
 
-    def update(self, dets, _):
+    def update(self, dets, color_image, depth_image = None, odom = None, masks = None):
         self.frame_id += 1
         activated_starcks = []
         refind_stracks = []
