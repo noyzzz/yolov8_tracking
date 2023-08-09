@@ -260,35 +260,29 @@ def run(
                     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
 
                 # pass detections to strongsort
-                with dt[3]:
-                    #if is ros node and reset_simulation_signal is true reset simulation
-                    if is_ros and extra_output["reset_signal"]:
-                        print("reset simulation*********************")
-                        tracker_list = []
-                        for i in range(bs):
-                            tracker = create_tracker(tracking_method, tracking_config, reid_weights, device, half)
-                            tracker_list.append(tracker, )
-                            if hasattr(tracker_list[i], 'model'):
-                                if hasattr(tracker_list[i].model, 'warmup'):
-                                    tracker_list[i].model.warmup()
-                        outputs = [None] * bs
-                    depth_image = extra_output["depth_image"]
-                    odom = extra_output["odom"]
-                    outputs[i] = None
-                    if tracker_list[i].use_depth and tracker_list[i].use_odometry:
-                        outputs[i] = tracker_list[i].update(det.cpu(), im0, depth_image, odom, masks[i])
-                    else:
-                        outputs[i] = tracker_list[i].update(det.cpu(), im0)
+            with dt[3]:
+                # #if is ros node and reset_simulation_signal is true reset simulation
+                # if is_ros and extra_output["reset_signal"]:
+                #     print("reset simulation*********************")
+                #     tracker_list = []
+                #     for i in range(bs):
+                #         tracker = create_tracker(tracking_method, tracking_config, reid_weights, device, half)
+                #         tracker_list.append(tracker, )
+                #         if hasattr(tracker_list[i], 'model'):
+                #             if hasattr(tracker_list[i].model, 'warmup'):
+                #                 tracker_list[i].model.warmup()
+                #     outputs = [None] * bs
+                depth_image = extra_output["depth_image"]
+                odom = extra_output["odom"]
+                outputs[i] = None
+                if tracker_list[i].use_depth and tracker_list[i].use_odometry:
+                    outputs[i] = tracker_list[i].update(det.cpu(), im0, depth_image, odom, masks[i])
+                else:
+                    outputs[i] = tracker_list[i].update(det.cpu(), im0)
 
                     #what is each det element? [x1, y1, x2, y2, conf, cls, cls_conf]
                     # outputs[i] =  tracker_list[i].update(det.cpu(), im0)
-
-
-
-
-
-
-                
+            if det is not None and len(det):  
                 # draw boxes for visualization
                 if len(outputs[i]) > 0:
                     
