@@ -62,10 +62,20 @@ class STrack(BaseTrack):
         self.frame_id = frame_id
         self.start_frame = frame_id
 
-    def re_activate(self, new_track, frame_id, new_id=False):
+    def re_activate(self, new_track, frame_id, new_id=False, odom = None): #TODO kalamn update should be called with odom
+        quaternion = (odom.pose.pose.orientation.x, odom.pose.pose.orientation.y,
+                      odom.pose.pose.orientation.z, odom.pose.pose.orientation.w)
+        #initialize the measurement mask to all trues with size 5
+        measurement_mask = np.ones((5,), dtype=np.bool)
+        if odom is None:
+            #throw exception
+            raise Exception("odom is None")
+        #get the yaw from the quaternion not using the tf library
+        yaw = np.arctan2(2.0 * (quaternion[3] * quaternion[2] + quaternion[0] * quaternion[1]),
+                         1.0 - 2.0 * (quaternion[1] * quaternion[1] + quaternion[2] * quaternion[2]))
+
         self.mean, self.covariance = self.kalman_filter.update(
-            self.mean, self.covariance, self.tlwh_to_xyah(new_track.tlwh)
-        )
+            self.mean, self.covariance, np.append(self.tlwh_to_xyah(new_track.tlwh), yaw), measurement_mask) #TODO 
         self.tracklet_len = 0
         self.state = TrackState.Tracked
         self.is_activated = True
@@ -99,6 +109,7 @@ class STrack(BaseTrack):
 
         #create the new measurement vector by appending self.tlwh_to_xyah(new_tlwh) with yaw
         if new_track is not None:
+            self.score = new_track.score
             measurement = np.append(self.tlwh_to_xyah(new_track.tlwh), yaw)
         else:
             #append first 4 elements of mean with yaw
@@ -110,8 +121,7 @@ class STrack(BaseTrack):
             self.mean, self.covariance, measurement, measurement_mask) #TODO define the update function for cases when we have odometry and depth
         self.state = TrackState.Tracked
         self.is_activated = True
-
-        self.score = new_track.score
+            
 
     @property
     # @jit(nopython=True)
@@ -247,10 +257,10 @@ class BYTETracker(object):
             track = strack_pool[itracked]
             det = detections[idet]
             if track.state == TrackState.Tracked:
-                track.update(detections[idet], self.frame_id)
+                track.update(detections[idet], self.frame_id, odom)
                 activated_starcks.append(track)
             else:
-                track.re_activate(det, self.frame_id, new_id=False)
+                track.re_activate(det, self.frame_id, new_id=False, odom = odom)
                 refind_stracks.append(track)
 
         ''' Step 3: Second association, with low score detection boxes'''
@@ -270,7 +280,7 @@ class BYTETracker(object):
                 track.update(det, self.frame_id, odom)
                 activated_starcks.append(track)
             else:
-                track.re_activate(det, self.frame_id, new_id=False)
+                track.re_activate(det, self.frame_id, new_id=False, odom = odom)
                 refind_stracks.append(track)
         #find tracks that are not associated with any detections in the current frame
         for it in u_track:
@@ -290,7 +300,7 @@ class BYTETracker(object):
         dists = matching.fuse_score(dists, detections)
         matches, u_unconfirmed, u_detection = matching.linear_assignment(dists, thresh=0.7)
         for itracked, idet in matches:
-            unconfirmed[itracked].update(detections[idet], self.frame_id)
+            unconfirmed[itracked].update(detections[idet], self.frame_id, odom)
             activated_starcks.append(unconfirmed[itracked])
         for it in u_unconfirmed:
             track = unconfirmed[it]

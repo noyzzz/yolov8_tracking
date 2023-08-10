@@ -273,7 +273,8 @@ def run(
                 #                 tracker_list[i].model.warmup()
                 #     outputs = [None] * bs
                 depth_image = extra_output["depth_image"]
-                odom = extra_output["odom"]
+                if extra_output["odom"] is not None:
+                    odom = extra_output["odom"]
                 outputs[i] = None
                 if tracker_list[i].use_depth and tracker_list[i].use_odometry:
                     outputs[i] = tracker_list[i].update(det.cpu(), im0, depth_image, odom, masks[i])

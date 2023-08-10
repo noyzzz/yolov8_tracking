@@ -218,19 +218,12 @@ class KalmanFilter(object):
         
         sqr = np.square(np.r_[std_pos, std_vel]).T
 
-        motion_cov = []
-        motion_mat = []
         for i in range(len(mean)):
-            motion_cov.append(np.diag(sqr[i]))
+            this_motion_cov = np.diag(sqr[i])
             this_motion_mat = self.calculate_motion_mat(mean[i])
-            motion_mat.append(this_motion_mat)
-        motion_cov = np.asarray(motion_cov)
-        motion_mat = np.asarray(motion_mat)
-        
-
-        mean = np.dot(mean, motion_mat.T)
-        left = np.dot(motion_mat, covariance).transpose((1, 0, 2))
-        covariance = np.dot(left, motion_mat.T) + motion_cov
+            mean[i] = np.dot(mean[i], this_motion_mat.T)
+            covariance[i] = np.linalg.multi_dot((
+                this_motion_mat, covariance[i], this_motion_mat.T)) + this_motion_cov
 
         return mean, covariance
 
@@ -269,7 +262,7 @@ class KalmanFilter(object):
         new_covariance = covariance - np.linalg.multi_dot((
             kalman_gain, projected_cov, kalman_gain.T)) #FIXME covariance formula is wrong
         #for each element of new_covariance only change it if the corresponding element of measurement_mask is True
-        new_covariance = np.where(measurement_mask, new_covariance, covariance)
+        # new_covariance = np.where(measurement_mask, new_covariance, covariance) #FIXME this is wrong
         return new_mean, new_covariance
 
     def gating_distance(self, mean, covariance, measurements,
