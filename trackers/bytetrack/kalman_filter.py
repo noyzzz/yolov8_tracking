@@ -39,8 +39,6 @@ class KalmanFilter(object):
     """
 
     def __init__(self, image_width, image_height, focal_length, *, params_dict = None):
-        #params_dict has the following keys: image_width, image_height, focal_length, D_matrix, check if any of these are available
-        #  and assign them to instance variables
         if params_dict is not None:
             param_keys = params_dict.keys()
             for key in param_keys:
@@ -221,18 +219,22 @@ class KalmanFilter(object):
         sqr = np.square(np.r_[std_pos, std_vel]).T
 
         motion_cov = []
+        motion_mat = []
         for i in range(len(mean)):
             motion_cov.append(np.diag(sqr[i]))
+            this_motion_mat = self.calculate_motion_mat(mean[i])
+            motion_mat.append(this_motion_mat)
         motion_cov = np.asarray(motion_cov)
-        this_motion_mat = self.calculate_motion_mat(mean)
+        motion_mat = np.asarray(motion_mat)
+        
 
-        mean = np.dot(mean, this_motion_mat.T)
-        left = np.dot(this_motion_mat, covariance).transpose((1, 0, 2))
-        covariance = np.dot(left, this_motion_mat.T) + motion_cov
+        mean = np.dot(mean, motion_mat.T)
+        left = np.dot(motion_mat, covariance).transpose((1, 0, 2))
+        covariance = np.dot(left, motion_mat.T) + motion_cov
 
         return mean, covariance
 
-    def update(self, mean, covariance, measurement):
+    def update(self, mean, covariance, measurement, measurement_mask):
         """Run Kalman filter correction step.
 
         Parameters
@@ -242,9 +244,11 @@ class KalmanFilter(object):
         covariance : ndarray
             The state's covariance matrix (8x8 dimensional).
         measurement : ndarray
-            The 4 dimensional measurement vector (x, y, a, h), where (x, y)
+            The 5 dimensional measurement vector (x, y, a, h, psi), where (x, y)
             is the center position, a the aspect ratio, and h the height of the
             bounding box.
+        measurement_mask : ndarray
+            A 5 dimensional boolean mask indicating whether the measurement is available for each element in the measurement vector.
 
         Returns
         -------
@@ -263,7 +267,9 @@ class KalmanFilter(object):
 
         new_mean = mean + np.dot(innovation, kalman_gain.T)
         new_covariance = covariance - np.linalg.multi_dot((
-            kalman_gain, projected_cov, kalman_gain.T))
+            kalman_gain, projected_cov, kalman_gain.T)) #FIXME covariance formula is wrong
+        #for each element of new_covariance only change it if the corresponding element of measurement_mask is True
+        new_covariance = np.where(measurement_mask, new_covariance, covariance)
         return new_mean, new_covariance
 
     def gating_distance(self, mean, covariance, measurements,

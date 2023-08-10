@@ -14,7 +14,7 @@ from trackers.bytetrack import matching
 from trackers.bytetrack.basetrack import BaseTrack, TrackState
 
 class STrack(BaseTrack):
-    shared_kalman = KalmanFilter() #TODO check the parameters
+    shared_kalman = KalmanFilter(640, 480, 462.0) #TODO check the parameters
     def __init__(self, tlwh, score, cls):
 
         # wait activate
@@ -51,7 +51,8 @@ class STrack(BaseTrack):
         """Start a new tracklet"""
         self.kalman_filter = kalman_filter
         self.track_id = self.next_id()
-        self.mean, self.covariance = self.kalman_filter.initiate(self.tlwh_to_xyah(self._tlwh))
+        
+        self.mean, self.covariance = self.kalman_filter.initiate(np.append(self.tlwh_to_xyah(self._tlwh), 0.0))
 
         self.tracklet_len = 0
         self.state = TrackState.Tracked
@@ -74,7 +75,7 @@ class STrack(BaseTrack):
         self.score = new_track.score
         self.cls = new_track.cls
 
-    def update(self, new_track, frame_id):
+    def update(self, new_track, frame_id, odom = None):
         """
         Update a matched track
         :type new_track: STrack
@@ -85,10 +86,28 @@ class STrack(BaseTrack):
         self.frame_id = frame_id
         self.tracklet_len += 1
         # self.cls = cls
+        quaternion = (odom.pose.pose.orientation.x, odom.pose.pose.orientation.y,
+                      odom.pose.pose.orientation.z, odom.pose.pose.orientation.w)
+        #initialize the measurement mask to all trues with size 5
+        measurement_mask = np.ones((5,), dtype=np.bool)
+        if odom is None:
+            #throw exception
+            raise Exception("odom is None")
+        #get the yaw from the quaternion not using the tf library
+        yaw = np.arctan2(2.0 * (quaternion[3] * quaternion[2] + quaternion[0] * quaternion[1]),
+                         1.0 - 2.0 * (quaternion[1] * quaternion[1] + quaternion[2] * quaternion[2]))
 
-        new_tlwh = new_track.tlwh
+        #create the new measurement vector by appending self.tlwh_to_xyah(new_tlwh) with yaw
+        if new_track is not None:
+            measurement = np.append(self.tlwh_to_xyah(new_track.tlwh), yaw)
+        else:
+            #append first 4 elements of mean with yaw
+            measurement = np.append(self.mean[:4], yaw)
+            #first four elements of measurement mask shouw be false 
+            measurement_mask[:4] = False
+        
         self.mean, self.covariance = self.kalman_filter.update(
-            self.mean, self.covariance, self.tlwh_to_xyah(new_tlwh)) #TODO define the update function for cases when we have odometry and depth
+            self.mean, self.covariance, measurement, measurement_mask) #TODO define the update function for cases when we have odometry and depth
         self.state = TrackState.Tracked
         self.is_activated = True
 
@@ -163,7 +182,7 @@ class BYTETracker(object):
         self.det_thresh = track_thresh + 0.1
         self.buffer_size = int(frame_rate / 30.0 * track_buffer)
         self.max_time_lost = self.buffer_size
-        self.kalman_filter = KalmanFilter() #TODO check the parameters
+        self.kalman_filter = KalmanFilter(640, 480, 462.0) #TODO check the parameters
         self.use_depth = True
         self.use_odometry = True
 
@@ -248,11 +267,15 @@ class BYTETracker(object):
             track = r_tracked_stracks[itracked]
             det = detections_second[idet]
             if track.state == TrackState.Tracked:
-                track.update(det, self.frame_id)
+                track.update(det, self.frame_id, odom)
                 activated_starcks.append(track)
             else:
                 track.re_activate(det, self.frame_id, new_id=False)
                 refind_stracks.append(track)
+        #find tracks that are not associated with any detections in the current frame
+        for it in u_track:
+            this_u_track = r_tracked_stracks[it]
+            this_u_track.update(None, self.frame_id, odom)
 
         for it in u_track:
             track = r_tracked_stracks[it]
