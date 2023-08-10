@@ -41,8 +41,9 @@ class STrack(BaseTrack):
             multi_covariance = np.asarray([st.covariance for st in stracks])
             for i, st in enumerate(stracks):
                 if st.state != TrackState.Tracked:
-                    multi_mean[i][7] = 0
+                    multi_mean[i][8] = 0
             multi_mean, multi_covariance = STrack.shared_kalman.multi_predict(multi_mean, multi_covariance)
+            a = 10
             for i, (mean, cov) in enumerate(zip(multi_mean, multi_covariance)):
                 stracks[i].mean = mean
                 stracks[i].covariance = cov
@@ -84,6 +85,7 @@ class STrack(BaseTrack):
             self.track_id = self.next_id()
         self.score = new_track.score
         self.cls = new_track.cls
+
 
     def update(self, new_track, frame_id, odom = None):
         """
@@ -196,6 +198,21 @@ class BYTETracker(object):
         self.use_depth = True
         self.use_odometry = True
 
+    def get_all_track_predictions(self):
+        """
+        Get the predictions of all the active tracks
+        :return: list of bounding boxes of all the active tracks
+        """
+        bboxes = []
+        for track in joint_stracks(self.tracked_stracks, self.lost_stracks):
+            bbox = track.tlwh
+            #append the track id to the bbox
+            bbox = np.append(bbox, track.track_id)
+            bboxes.append(bbox)
+        return bboxes
+
+        
+
     def update(self, dets, color_image, depth_image = None, odom = None, masks = None):
         self.frame_id += 1
         activated_starcks = []
@@ -246,6 +263,8 @@ class BYTETracker(object):
 
         ''' Step 2: First association, with high score detection boxes'''
         strack_pool = joint_stracks(tracked_stracks, self.lost_stracks)
+        for track in strack_pool:
+            print("                    YAW_DOT: ", "  id: ", str(track.track_id), track.mean[-1])
         # Predict the current location with KF
         STrack.multi_predict(strack_pool)
         dists = matching.iou_distance(strack_pool, detections)
@@ -283,9 +302,9 @@ class BYTETracker(object):
                 track.re_activate(det, self.frame_id, new_id=False, odom = odom)
                 refind_stracks.append(track)
         #find tracks that are not associated with any detections in the current frame
-        for it in u_track:
-            this_u_track = r_tracked_stracks[it]
-            this_u_track.update(None, self.frame_id, odom)
+        for this_strack in strack_pool:
+            if this_strack.state == TrackState.Lost:
+                this_strack.update(None, self.frame_id, odom)
 
         for it in u_track:
             track = r_tracked_stracks[it]

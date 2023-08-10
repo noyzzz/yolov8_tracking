@@ -276,13 +276,24 @@ def run(
                 if extra_output["odom"] is not None:
                     odom = extra_output["odom"]
                 outputs[i] = None
+                track_pred_tlwhs = None
                 if tracker_list[i].use_depth and tracker_list[i].use_odometry:
-                    outputs[i] = tracker_list[i].update(det.cpu(), im0, depth_image, odom, masks[i])
+                    outputs[i] = tracker_list[i].update(det.cpu(), im0, depth_image, odom, None)
                 else:
                     outputs[i] = tracker_list[i].update(det.cpu(), im0)
+                track_pred_tlwhs = tracker_list[i].get_all_track_predictions()
 
                     #what is each det element? [x1, y1, x2, y2, conf, cls, cls_conf]
                     # outputs[i] =  tracker_list[i].update(det.cpu(), im0)
+
+            for track_pred in track_pred_tlwhs:
+                xyxy = ops.xywh2xyxy(track_pred[0:4])
+                track_id = track_pred[4]
+                #if xyxy is out of the image or if any of them is nan, do not draw it 
+                if xyxy[0] < 0 or xyxy[1] < 0 or xyxy[2] > im0.shape[1] or xyxy[3] > im0.shape[0] or np.isnan(xyxy).any():
+                    continue
+                annotator.box_label(xyxy, str(track_id), color=(255, 0, 0))
+
             if det is not None and len(det):  
                 # draw boxes for visualization
                 if len(outputs[i]) > 0:
@@ -295,7 +306,7 @@ def run(
                             im_gpu=torch.as_tensor(im0, dtype=torch.float16).to(device).permute(2, 0, 1).flip(0).contiguous() /
                             255 if retina_masks else im[i]
                         )
-                    
+                        
                     for j, (output) in enumerate(outputs[i]):
                         
                         bbox = output[0:4]
