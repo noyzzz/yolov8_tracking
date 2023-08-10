@@ -60,7 +60,7 @@ class KalmanFilter(object):
         self._std_weight_velocity = 1. / 160
 
         # should be tuned
-        self._std_weight_angle = 1. / 20
+        self._std_weight_angle = 1. / 20000
         self._std_weight_angular_velocity = 1. / 160
         self._std_angle_process_noise = 10.
         self._std_angular_vel_process_noise = 10.
@@ -250,19 +250,25 @@ class KalmanFilter(object):
 
         """
         projected_mean, projected_cov = self.project(mean, covariance)
+        PHT = np.dot(covariance, self._update_mat.T)
+        SI = np.linalg.inv(projected_cov)
+        kalman_gain = np.dot(PHT, SI)
 
-        chol_factor, lower = scipy.linalg.cho_factor(
-            projected_cov, lower=True, check_finite=False)
-        kalman_gain = scipy.linalg.cho_solve(
-            (chol_factor, lower), np.dot(covariance, self._update_mat.T).T,
-            check_finite=False).T
+        # chol_factor, lower = scipy.linalg.cho_factor(
+        #     projected_cov, lower=True, check_finite=False)
+        # kalman_gain = scipy.linalg.cho_solve(
+        #     (chol_factor, lower), np.dot(covariance, self._update_mat.T).T,
+        #     check_finite=False).T
         innovation = measurement - projected_mean
 
         new_mean = mean + np.dot(innovation, kalman_gain.T)
-        new_covariance = covariance - np.linalg.multi_dot((
-            kalman_gain, projected_cov, kalman_gain.T)) #FIXME covariance formula is wrong
-        #for each element of new_covariance only change it if the corresponding element of measurement_mask is True
-        # new_covariance = np.where(measurement_mask, new_covariance, covariance) #FIXME this is wrong
+        I_KH = np.eye(kalman_gain.shape[0]) - np.dot(kalman_gain, self._update_mat)
+        I_KHT = I_KH.T
+        new_covariance = np.dot(I_KH, covariance) #simplified covariance update equation
+        # new_covariance = covariance - np.linalg.multi_dot((
+        #     kalman_gain, projected_cov, kalman_gain.T))
+
+
         return new_mean, new_covariance
 
     def gating_distance(self, mean, covariance, measurements,
