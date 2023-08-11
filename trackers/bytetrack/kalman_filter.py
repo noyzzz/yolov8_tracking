@@ -249,6 +249,12 @@ class KalmanFilter(object):
             Returns the measurement-corrected state distribution.
 
         """
+
+        if not np.all(measurement_mask):
+            mean[9] = (measurement[4] - mean[4])/3
+            mean[4] = measurement[4]
+            print(measurement[4])
+            return mean, covariance
         projected_mean, projected_cov = self.project(mean, covariance)
         PHT = np.dot(covariance, self._update_mat.T)
         SI = np.linalg.inv(projected_cov)
@@ -267,7 +273,6 @@ class KalmanFilter(object):
         new_covariance = np.dot(I_KH, covariance) #simplified covariance update equation
         # new_covariance = covariance - np.linalg.multi_dot((
         #     kalman_gain, projected_cov, kalman_gain.T))
-
 
         return new_mean, new_covariance
 
