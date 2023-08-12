@@ -51,6 +51,7 @@ class KalmanFilter(object):
         self._motion_mat = np.eye(2 * self.ndim, 2 * self.ndim)
         for i in range(self.ndim):
             self._motion_mat[i, self.ndim + i] = self.dt
+        self._motion_mat[4,9] = 0.0 #FIXME this is a hack, should be removed
         self._update_mat = np.eye(self.ndim, 2 * self.ndim)     
 
         # Motion and observation uncertainty are chosen relative to the current
@@ -60,8 +61,8 @@ class KalmanFilter(object):
         self._std_weight_velocity = 1. / 160
 
         # should be tuned
-        self._std_weight_angle = 1. / 20000
-        self._std_weight_angular_velocity = 1. / 160
+        self._std_weight_angle = 1. / 20
+        self._std_weight_angular_velocity = 1. / 16
         self._std_angle_process_noise = 10.
         self._std_angular_vel_process_noise = 10.
 
@@ -250,11 +251,12 @@ class KalmanFilter(object):
 
         """
 
-        if not np.all(measurement_mask):
-            mean[9] = (measurement[4] - mean[4])/3
-            mean[4] = measurement[4]
-            print(measurement[4])
-            return mean, covariance
+        # if not np.all(measurement_mask):
+        #     mean[9] = (measurement[4] - mean[4])/self.dt
+        #     mean[4] = measurement[4]
+        #     print(measurement[4])
+        #     return mean, covariance
+
         projected_mean, projected_cov = self.project(mean, covariance)
         PHT = np.dot(covariance, self._update_mat.T)
         SI = np.linalg.inv(projected_cov)
@@ -268,11 +270,16 @@ class KalmanFilter(object):
         innovation = measurement - projected_mean
 
         new_mean = mean + np.dot(innovation, kalman_gain.T)
+        if not np.all(measurement_mask):
+            new_mean[9] = (measurement[4] - mean[4])/self.dt #FIXME this is a hack, should be fixed
+        # print("new mean 9                                                           :     ", new_mean[9])
+        new_mean[4] = measurement[4]
         I_KH = np.eye(kalman_gain.shape[0]) - np.dot(kalman_gain, self._update_mat)
         I_KHT = I_KH.T
         new_covariance = np.dot(I_KH, covariance) #simplified covariance update equation
         # new_covariance = covariance - np.linalg.multi_dot((
         #     kalman_gain, projected_cov, kalman_gain.T))
+
 
         return new_mean, new_covariance
 

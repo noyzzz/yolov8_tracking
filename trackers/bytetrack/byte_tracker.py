@@ -13,9 +13,12 @@ from trackers.bytetrack.kalman_filter import KalmanFilter
 from trackers.bytetrack import matching
 from trackers.bytetrack.basetrack import BaseTrack, TrackState
 
+IMG_WIDTH = 640
+IMG_HEIGHT = 480
+
 class STrack(BaseTrack):
     current_yaw = 0;
-    shared_kalman = KalmanFilter(640, 480, 462.0) #TODO check the parameters
+    shared_kalman = KalmanFilter(IMG_WIDTH, IMG_HEIGHT, 462.0) #TODO check the parameters
     def __init__(self, tlwh, score, cls):
 
         # wait activate
@@ -34,8 +37,8 @@ class STrack(BaseTrack):
         #get the yaw from the quaternion not using the tf library
         yaw = np.arctan2(2.0 * (quaternion[3] * quaternion[2] + quaternion[0] * quaternion[1]),
                          1.0 - 2.0 * (quaternion[1] * quaternion[1] + quaternion[2] * quaternion[2]))
-        while yaw*STrack.current_yaw < 0:
-            if yaw < 0:
+        while  abs(yaw-STrack.current_yaw) > np.pi :
+            if yaw < STrack.current_yaw :
                 yaw += 2*np.pi
             else:
                 yaw -= 2*np.pi
@@ -200,7 +203,7 @@ class BYTETracker(object):
         self.det_thresh = track_thresh + 0.1
         self.buffer_size = int(frame_rate / 30.0 * track_buffer)
         self.max_time_lost = 30000#self.buffer_size
-        self.kalman_filter = KalmanFilter(640, 480, 462.0) #TODO check the parameters
+        self.kalman_filter = KalmanFilter(IMG_WIDTH, IMG_HEIGHT, 462.0) #TODO check the parameters
         self.use_depth = True
         self.use_odometry = True
 
