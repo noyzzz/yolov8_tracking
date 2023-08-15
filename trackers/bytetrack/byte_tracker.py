@@ -12,6 +12,8 @@ from yolov8.ultralytics.yolo.utils.ops import xywh2xyxy, xyxy2xywh
 from trackers.bytetrack.kalman_filter import KalmanFilter
 from trackers.bytetrack import matching
 from trackers.bytetrack.basetrack import BaseTrack, TrackState
+import sys
+import time
 
 IMG_WIDTH = 640
 IMG_HEIGHT = 480
@@ -43,6 +45,7 @@ class STrack(BaseTrack):
             else:
                 yaw -= 2*np.pi
         STrack.current_yaw = yaw
+        print("current yaw is ", STrack.current_yaw)
 
     def predict(self):
         mean_state = self.mean.copy()
@@ -190,7 +193,7 @@ class STrack(BaseTrack):
 
 
 class BYTETracker(object):
-    def __init__(self, track_thresh=0.45, match_thresh=0.8, track_buffer=25, frame_rate=30):
+    def __init__(self, track_thresh=0.45, match_thresh=0.5, track_buffer=25, frame_rate=30):
         self.tracked_stracks = []  # type: list[STrack]
         self.lost_stracks = []  # type: list[STrack]
         self.removed_stracks = []  # type: list[STrack]
@@ -272,8 +275,10 @@ class BYTETracker(object):
 
         ''' Step 2: First association, with high score detection boxes'''
         strack_pool = joint_stracks(tracked_stracks, self.lost_stracks)
-        for track in strack_pool:
-            print("                    YAW_DOT: ", "  id: ", str(track.track_id), track.mean[9])
+        if len(tracked_stracks) > 0:
+            track_print = tracked_stracks[-1]
+            # print (f"track id: , {track_print.track_id:>5},  x_dot:  , {track_print.mean[5]:>5.2f}, yaw_dot: , {100*track_print.mean[9]:>5.2f}", flush=True)
+            # time.sleep(0.01)
         # Predict the current location with KF
         STrack.multi_predict(strack_pool)
         dists = matching.iou_distance(strack_pool, detections)
