@@ -12,12 +12,16 @@ from yolov8.ultralytics.yolo.utils.ops import xywh2xyxy, xyxy2xywh
 from trackers.bytetrack.kalman_filter import KalmanFilter
 from trackers.bytetrack import matching
 from trackers.bytetrack.basetrack import BaseTrack, TrackState
+import time
+from torch.utils.tensorboard import SummaryWriter
+import datetime
 
 IMG_WIDTH = 640
 IMG_HEIGHT = 480
 
 class STrack(BaseTrack):
     current_yaw = 0;
+    current_yaw_dot = 0;
     shared_kalman = KalmanFilter(IMG_WIDTH, IMG_HEIGHT, 462.0) #TODO check the parameters
     def __init__(self, tlwh, score, cls):
 
@@ -42,13 +46,16 @@ class STrack(BaseTrack):
                 yaw += 2*np.pi
             else:
                 yaw -= 2*np.pi
+        twist = odom.twist.twist
+        STrack.current_yaw_dot = twist.angular.z / 31.0 # frames are being published at 31Hz in the simulator
         STrack.current_yaw = yaw
+        # print("current yaw is ", STrack.current_yaw)
 
     def predict(self):
         mean_state = self.mean.copy()
         if self.state != TrackState.Tracked:
             mean_state[7] = 0
-        self.mean, self.covariance = self.kalman_filter.predict(mean_state, self.covariance)
+        self.mean, self.covariance = self.kalman_filter.predict(mean_state, self.covariance, np.array([STrack.current_yaw_dot]))
 
     @staticmethod
     def multi_predict(stracks):
@@ -57,9 +64,8 @@ class STrack(BaseTrack):
             multi_covariance = np.asarray([st.covariance for st in stracks])
             for i, st in enumerate(stracks):
                 if st.state != TrackState.Tracked:
-                    multi_mean[i][8] = 0
-            multi_mean, multi_covariance = STrack.shared_kalman.multi_predict(multi_mean, multi_covariance)
-            a = 10
+                    multi_mean[i][7] = 0
+            multi_mean, multi_covariance = STrack.shared_kalman.multi_predict(multi_mean, multi_covariance, np.array([STrack.current_yaw_dot]))
             for i, (mean, cov) in enumerate(zip(multi_mean, multi_covariance)):
                 stracks[i].mean = mean
                 stracks[i].covariance = cov
@@ -69,7 +75,7 @@ class STrack(BaseTrack):
         self.kalman_filter = kalman_filter
         self.track_id = self.next_id()
         
-        self.mean, self.covariance = self.kalman_filter.initiate(np.append(self.tlwh_to_xyah(self._tlwh), 0.0))
+        self.mean, self.covariance = self.kalman_filter.initiate(self.tlwh_to_xyah(self._tlwh))
 
         self.tracklet_len = 0
         self.state = TrackState.Tracked
@@ -79,17 +85,11 @@ class STrack(BaseTrack):
         self.frame_id = frame_id
         self.start_frame = frame_id
 
-    def re_activate(self, new_track, frame_id, new_id=False, odom = None): #TODO kalamn update should be called with odom
+    def re_activate(self, new_track, frame_id, new_id=False): #TODO kalamn update should be called with odom
         #initialize the measurement mask to all trues with size 5
-        measurement_mask = np.ones((5,), dtype=np.bool)
-        if odom is None:
-            #throw exception
-            raise Exception("odom is None")
-        #get the yaw from the quaternion not using the tf library
-        STrack.update_yaw(odom)
 
         self.mean, self.covariance = self.kalman_filter.update(
-            self.mean, self.covariance, np.append(self.tlwh_to_xyah(new_track.tlwh), STrack.current_yaw), measurement_mask) #TODO 
+            self.mean, self.covariance, self.tlwh_to_xyah(new_track.tlwh))
         self.tracklet_len = 0
         self.state = TrackState.Tracked
         self.is_activated = True
@@ -100,7 +100,7 @@ class STrack(BaseTrack):
         self.cls = new_track.cls
 
 
-    def update(self, new_track, frame_id, odom = None):
+    def update(self, new_track, frame_id):
         """
         Update a matched track
         :type new_track: STrack
@@ -111,24 +111,10 @@ class STrack(BaseTrack):
         self.frame_id = frame_id
         self.tracklet_len += 1
         # self.cls = cls
-        measurement_mask = np.ones((5,), dtype=np.bool)
-        #initialize the measurement mask to all trues with size 5
-        if odom is None:
-            #throw exception
-            raise Exception("odom is None")
-        STrack.update_yaw(odom)
-        #create the new measurement vector by appending self.tlwh_to_xyah(new_tlwh) with yaw
-        if new_track is not None:
-            self.score = new_track.score
-            measurement = np.append(self.tlwh_to_xyah(new_track.tlwh), STrack.current_yaw)
-        else:
-            #append first 4 elements of mean with yaw
-            measurement = np.append(self.mean[:4], STrack.current_yaw)
-            #first four elements of measurement mask shouw be false 
-            measurement_mask[:4] = False
+        measurement = self.tlwh_to_xyah(new_track.tlwh)
         
         self.mean, self.covariance = self.kalman_filter.update(
-            self.mean, self.covariance, measurement, measurement_mask) #TODO define the update function for cases when we have odometry and depth
+            self.mean, self.covariance, measurement)
         if new_track is not None:
             self.state = TrackState.Tracked
             self.is_activated = True
@@ -206,6 +192,10 @@ class BYTETracker(object):
         self.kalman_filter = KalmanFilter(IMG_WIDTH, IMG_HEIGHT, 462.0) #TODO check the parameters
         self.use_depth = True
         self.use_odometry = True
+        self.time_window_list = deque(maxlen=300)
+        self.last_time = time.time()
+        #initialize self.writer tensorboard writer
+        self.writer = SummaryWriter("./runs/{}".format(datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")))
 
     def get_all_track_predictions(self):
         """
@@ -223,6 +213,15 @@ class BYTETracker(object):
         
 
     def update(self, dets, color_image, depth_image = None, odom = None, masks = None):
+        STrack.update_yaw(odom)
+        #get the current time and compare it with the last time update was called
+        time_now = time.time()
+        self.time_window_list.append(1.0/(time_now - self.last_time))
+        #print the average and standard deviation of the time window
+        # if self.frame_id % 100 == 0:
+        #     print("Average fps: ", np.mean(self.time_window_list), "Standard deviation: ", np.std(self.time_window_list))
+        self.last_time = time_now
+
         self.frame_id += 1
         activated_starcks = []
         refind_stracks = []
@@ -272,8 +271,41 @@ class BYTETracker(object):
 
         ''' Step 2: First association, with high score detection boxes'''
         strack_pool = joint_stracks(tracked_stracks, self.lost_stracks)
-        for track in strack_pool:
-            print("                    YAW_DOT: ", "  id: ", str(track.track_id), track.mean[9])
+        if len(tracked_stracks) > 0:
+            track_print = tracked_stracks[-1]
+            print (f"track id: , {track_print.track_id:>5},  x_dot:  , {100*track_print.mean[5]:>5.2f}, x_cov:  {track_print.covariance[0,0]:>5.2f} , current_yaw_dot:   {100*STrack.current_yaw_dot:>5.2f}", flush=True)
+        
+        #take log from the track means and covariances and visualize them in tensorboard
+        if self.frame_id % 10 == 0:
+            for track in tracked_stracks:
+                track_id = track.track_id
+                mean = track.mean
+                covariance = track.covariance
+                self.writer.add_scalar(f"loc/Track {track_id} x", mean[0], self.frame_id)
+                self.writer.add_scalar(f"loc/Track {track_id} y", mean[1], self.frame_id)
+                self.writer.add_scalar(f"loc/Track {track_id} a", mean[2], self.frame_id)
+                self.writer.add_scalar(f"loc/Track {track_id} h", mean[3], self.frame_id)
+                self.writer.add_scalar(f"vel/Track {track_id} x_dot", mean[4], self.frame_id)
+                self.writer.add_scalar(f"vel/Track {track_id} y_dot", mean[5], self.frame_id)
+                self.writer.add_scalar(f"vel/Track {track_id} a_dot", mean[6], self.frame_id)
+                self.writer.add_scalar(f"vel/Track {track_id} h_dot", mean[7], self.frame_id)
+                self.writer.add_scalar(f"loc_cov/Track {track_id} x_cov", covariance[0,0], self.frame_id)
+                self.writer.add_scalar(f"loc_cov/Track {track_id} y_cov", covariance[1,1], self.frame_id)
+                self.writer.add_scalar(f"loc_cov/Track {track_id} a_cov", covariance[2,2], self.frame_id)
+                self.writer.add_scalar(f"loc_cov/Track {track_id} h_cov", covariance[3,3], self.frame_id)
+                self.writer.add_scalar(f"vel_cov/Track {track_id} x_dot_cov", covariance[4,4], self.frame_id)
+                self.writer.add_scalar(f"vel_cov/Track {track_id} y_dot_cov", covariance[5,5], self.frame_id)
+                self.writer.add_scalar(f"vel_cov/Track {track_id} a_dot_cov", covariance[6,6], self.frame_id)
+                self.writer.add_scalar(f"vel_cov/Track {track_id} h_dot_cov", covariance[7,7], self.frame_id)
+                self.writer.add_scalar(f"vel/current_yaw_dot", STrack.current_yaw_dot, self.frame_id)
+                #flush the writer
+                self.writer.flush()
+                
+                
+
+
+
+
         # Predict the current location with KF
         STrack.multi_predict(strack_pool)
         dists = matching.iou_distance(strack_pool, detections)
@@ -285,10 +317,10 @@ class BYTETracker(object):
             track = strack_pool[itracked]
             det = detections[idet]
             if track.state == TrackState.Tracked:
-                track.update(detections[idet], self.frame_id, odom)
+                track.update(detections[idet], self.frame_id)
                 activated_starcks.append(track)
             else:
-                track.re_activate(det, self.frame_id, new_id=False, odom = odom)
+                track.re_activate(det, self.frame_id, new_id=False)
                 refind_stracks.append(track)
 
         ''' Step 3: Second association, with low score detection boxes'''
@@ -305,15 +337,11 @@ class BYTETracker(object):
             track = r_tracked_stracks[itracked]
             det = detections_second[idet]
             if track.state == TrackState.Tracked:
-                track.update(det, self.frame_id, odom)
+                track.update(det, self.frame_id)
                 activated_starcks.append(track)
             else:
-                track.re_activate(det, self.frame_id, new_id=False, odom = odom)
+                track.re_activate(det, self.frame_id, new_id=False)
                 refind_stracks.append(track)
-        #find tracks that are not associated with any detections in the current frame
-        for this_strack in strack_pool:
-            if this_strack.state == TrackState.Lost:
-                this_strack.update(None, self.frame_id, odom)
 
         for it in u_track:
             track = r_tracked_stracks[it]
@@ -328,7 +356,7 @@ class BYTETracker(object):
         dists = matching.fuse_score(dists, detections)
         matches, u_unconfirmed, u_detection = matching.linear_assignment(dists, thresh=0.7)
         for itracked, idet in matches:
-            unconfirmed[itracked].update(detections[idet], self.frame_id, odom)
+            unconfirmed[itracked].update(detections[idet], self.frame_id)
             activated_starcks.append(unconfirmed[itracked])
         for it in u_unconfirmed:
             track = unconfirmed[it]
