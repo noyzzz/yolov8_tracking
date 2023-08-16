@@ -272,13 +272,7 @@ def run(
                                 if hasattr(tracker_list[i].model, 'warmup'):
                                     tracker_list[i].model.warmup()
                         outputs = [None] * bs
-                    depth_image = extra_output["depth_image"]
-                    odom = extra_output["odom"]
-                    outputs[i] = None
-                    if tracker_list[i].use_depth and tracker_list[i].use_odometry:
-                        outputs[i] = tracker_list[i].update(det.cpu(), im0, depth_image, odom, masks[i])
-                    else:
-                        outputs[i] = tracker_list[i].update(det.cpu(), im0)
+                    outputs[i] = tracker_list[i].update(det.cpu(), im0)
 
                     #what is each det element? [x1, y1, x2, y2, conf, cls, cls_conf]
                     # outputs[i] =  tracker_list[i].update(det.cpu(), im0)
