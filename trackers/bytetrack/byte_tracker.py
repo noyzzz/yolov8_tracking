@@ -273,7 +273,12 @@ class BYTETracker(object):
         strack_pool = joint_stracks(tracked_stracks, self.lost_stracks)
         if len(tracked_stracks) > 0:
             track_print = tracked_stracks[-1]
-            print (f"track id: , {track_print.track_id:>5},  x_dot:  , {100*track_print.mean[4]:>5.2f}, x_cov:  {track_print.covariance[0,0]:>5.2f} , current_yaw_dot:   {100*STrack.current_yaw_dot:>5.2f}", flush=True)
+            print(
+                f"track id: {track_print.track_id:>2}, \
+                    x: {track_print.mean[0]:>5.2f}, x_dot: {track_print.mean[4]:>5.2f}, x_cov: {track_print.covariance[0,0]:>5.2f} \
+                    y: {track_print.mean[1]:>5.2f}, y_dot: {track_print.mean[5]:>5.2f}, y_cov: {track_print.covariance[1,1]:>5.2f}\
+                        , current_yaw_dot:   {STrack.current_yaw_dot:>5.2f}")
+            # print (f"track id: , {track_print.track_id:>5},  x_dot:  , {100*track_print.mean[4]:>5.2f}, x_cov:  {track_print.covariance[0,0]:>5.2f} , current_yaw_dot:   {100*STrack.current_yaw_dot:>5.2f}", flush=True)
         
         #take log from the track means and covariances and visualize them in tensorboard
         if self.frame_id % 10 == 0:
