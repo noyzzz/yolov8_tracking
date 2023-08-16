@@ -26,7 +26,7 @@ class KalmanFilter(object):
 
     The 8-dimensional state space
 
-        x, y, a, h, psi, vx, vy, va, vh, vpsi
+        x, y, a, h, vx, vy, va, vh
 
     contains the bounding box center position (x, y), aspect ratio a, height h,
     and their respective velocities.
@@ -34,7 +34,6 @@ class KalmanFilter(object):
     Object motion follows a constant velocity model. The bounding box location
     (x, y, a, h) is taken as direct observation of the state space (linear
     observation model).
-    psi is the angle of the robot, vpsi is the angular velocity of the robot
 
     """
 
@@ -44,33 +43,34 @@ class KalmanFilter(object):
             for key in param_keys:
                 setattr(self, key, params_dict[key])
         self.image_width, self.image_height, self.focal_length = image_width, image_height, focal_length
-        self.ndim, self.dt = 5, 1.
+        self.ndim, self.dt = 4, 1.
 
         # Create Kalman filter model matrices.
         #_motion_mat is the base matrix, should not be directly used in the equations
         self._motion_mat = np.eye(2 * self.ndim, 2 * self.ndim)
         for i in range(self.ndim):
             self._motion_mat[i, self.ndim + i] = self.dt
-        self._motion_mat[4,9] = 0.0 #FIXME this is a hack, should be removed
         self._update_mat = np.eye(self.ndim, 2 * self.ndim)     
+        self.control_mat = np.zeros((2 * self.ndim, 1))
 
         # Motion and observation uncertainty are chosen relative to the current
         # state estimate. These weights control the amount of uncertainty in
         # the model. This is a bit hacky.
-        self._std_weight_position = 1. / 20
-        self._std_weight_velocity = 1. / 160
-
-        # should be tuned
-        self._std_weight_angle = 1. / 20
-        self._std_weight_angular_velocity = 1. / 16
-        self._std_angle_process_noise = 10.
-        self._std_angular_vel_process_noise = 10.
+        self._std_weight_position = 20.0#1. / 20
+        self._std_weight_velocity = 10.0#1. / 160
 
     def calculate_motion_mat(self, mean):
+        return self._motion_mat
+        # u1 = mean[0] - self.image_width/2
+        # robot_yaw_to_pixel_coeff = (u1**2/self.focal_length**2 + 1)*self.focal_length
+        # self._motion_mat[0, 2*self.ndim-1] = robot_yaw_to_pixel_coeff*self.dt
+        # return self._motion_mat\
+
+    def calculate_control_mat(self, mean):
         u1 = mean[0] - self.image_width/2
         robot_yaw_to_pixel_coeff = (u1**2/self.focal_length**2 + 1)*self.focal_length
-        self._motion_mat[0, 2*self.ndim-1] = robot_yaw_to_pixel_coeff*self.dt
-        return self._motion_mat
+        self.control_mat[0, 0] = robot_yaw_to_pixel_coeff*self.dt
+        return self.control_mat
 
 
     def initiate(self, measurement):
@@ -99,27 +99,28 @@ class KalmanFilter(object):
             2 * self._std_weight_position * measurement[3],
             1e-2,
             2 * self._std_weight_position * measurement[3],
-            1e-2, # for psi
             10 * self._std_weight_velocity * measurement[3],
             10 * self._std_weight_velocity * measurement[3],
             1e-5,
-            10 * self._std_weight_velocity * measurement[3],
-            1e-1 # for vpsi
+            10 * self._std_weight_velocity * measurement[3]
             ]
         covariance = np.diag(np.square(std))
         return mean, covariance
 
-    def predict(self, mean, covariance):
+    def predict(self, mean, covariance, input_signal):
         """Run Kalman filter prediction step.
 
         Parameters
         ----------
         mean : ndarray
-            The 10 dimensional mean vector of the object state at the previous
+            The 8 dimensional mean vector of the object state at the previous
             time step.
         covariance : ndarray
-            The 10x10 dimensional covariance matrix of the object state at the
+            The 8x8 dimensional covariance matrix of the object state at the
             previous time step.
+        input_signal : ndarray
+            The 1 dimensional control signal vector that contains the robot's
+            yaw velocity.
 
         Returns
         -------
@@ -130,24 +131,23 @@ class KalmanFilter(object):
         """
         # Process noise standard deviation
         std_pos = [
-            self._std_weight_position * mean[3],
-            self._std_weight_position * mean[3],
+            self._std_weight_position ,
+            self._std_weight_position ,
             1e-2,
-            self._std_weight_position * mean[3],
-            self._std_angle_process_noise] 
+            self._std_weight_position ] 
         std_vel = [
-            self._std_weight_velocity * mean[3],
-            self._std_weight_velocity * mean[3],
+            self._std_weight_velocity ,
+            self._std_weight_velocity ,
             1e-5,
-            self._std_weight_velocity * mean[3],
-            self._std_angular_vel_process_noise]
+            self._std_weight_velocity ]
                 
         motion_cov = np.diag(np.square(np.r_[std_pos, std_vel]))
 
         #mean = np.dot(self._motion_mat, mean)
-        # predict new state: x_pred = F * x
+        # predict new state: x_pred = F * x + B * u
         this_motion_mat = self.calculate_motion_mat(mean)
-        mean = np.dot(mean, this_motion_mat.T) # mean is a horizontal vector of shape (1, 10)
+        this_control_mat = self.calculate_control_mat(mean)
+        mean = np.dot(mean, this_motion_mat.T) + np.dot(input_signal, this_control_mat.T)
         # predict new covariance: P_pred = F * P * F.T + Q
         covariance = np.linalg.multi_dot((
             this_motion_mat, covariance, this_motion_mat.T)) + motion_cov 
@@ -172,13 +172,18 @@ class KalmanFilter(object):
 
         """
         # standard deviation of the measurement noise
+        # std = [
+            # self._std_weight_position ,
+            # self._std_weight_position ,
+            # 1e-1,
+            # self._std_weight_position 
+        # ]
         std = [
-            self._std_weight_position * mean[3],
-            self._std_weight_position * mean[3],
+            np.abs(mean[0] - self.image_width/2)/30,
+            np.abs(mean[1] - self.image_height/2)/30,
             1e-1,
-            self._std_weight_position * mean[3],
-            self._std_weight_angle * mean[9], #should be tuned
-        ]
+            1]
+
         innovation_cov = np.diag(np.square(std))
 
         # mean = H * x_hat 
@@ -188,15 +193,15 @@ class KalmanFilter(object):
             self._update_mat, covariance, self._update_mat.T))
         return mean, covariance + innovation_cov
 
-    def multi_predict(self, mean, covariance):
+    def multi_predict(self, mean, covariance, control_signal):
         """Run Kalman filter prediction step (Vectorized version).
         Parameters
         ----------
         mean : ndarray
-            The Nx10 dimensional mean matrix of the object states at the previous
+            The 8 dimensional mean matrix of the object states at the previous
             time step.
         covariance : ndarray
-            The Nx10x10 dimensional covariance matrics of the object states at the
+            The Nx8x8 dimensional covariance matrics of the object states at the
             previous time step.
         Returns
         -------
@@ -205,30 +210,29 @@ class KalmanFilter(object):
             state. Unobserved velocities are initialized to 0 mean.
         """
         std_pos = [
-            self._std_weight_position * mean[:, 3],
-            self._std_weight_position * mean[:, 3],
+            self._std_weight_position * np.ones_like(mean[:, 3]),
+            self._std_weight_position * np.ones_like(mean[:, 3]),
             1e-2 * np.ones_like(mean[:, 3]),
-            self._std_weight_position * mean[:, 3],
-            self._std_angle_process_noise * np.ones_like(mean[:, 3])]
+            self._std_weight_position * np.ones_like(mean[:, 3])]
         std_vel = [
-            self._std_weight_velocity * mean[:, 3],
-            self._std_weight_velocity * mean[:, 3],
+            self._std_weight_velocity * np.ones_like(mean[:, 3]),
+            self._std_weight_velocity * np.ones_like(mean[:, 3]),
             1e-5 * np.ones_like(mean[:, 3]),
-            self._std_weight_velocity * mean[:, 3],
-            self._std_angular_vel_process_noise * np.ones_like(mean[:, 3])]
+            self._std_weight_velocity * np.ones_like(mean[:, 3])]
         
         sqr = np.square(np.r_[std_pos, std_vel]).T
 
         for i in range(len(mean)):
             this_motion_cov = np.diag(sqr[i])
             this_motion_mat = self.calculate_motion_mat(mean[i])
-            mean[i] = np.dot(mean[i], this_motion_mat.T)
+            this_control_mat = self.calculate_control_mat(mean[i])
+            mean[i] = np.dot(mean[i], this_motion_mat.T) + np.dot(control_signal, this_control_mat.T)
             covariance[i] = np.linalg.multi_dot((
                 this_motion_mat, covariance[i], this_motion_mat.T)) + this_motion_cov
 
         return mean, covariance
 
-    def update(self, mean, covariance, measurement, measurement_mask):
+    def update(self, mean, covariance, measurement):
         """Run Kalman filter correction step.
 
         Parameters
@@ -270,10 +274,6 @@ class KalmanFilter(object):
         innovation = measurement - projected_mean
 
         new_mean = mean + np.dot(innovation, kalman_gain.T)
-        if not np.all(measurement_mask):
-            new_mean[9] = (measurement[4] - mean[4])/self.dt #FIXME this is a hack, should be fixed
-        # print("new mean 9                                                           :     ", new_mean[9])
-        new_mean[4] = measurement[4]
         I_KH = np.eye(kalman_gain.shape[0]) - np.dot(kalman_gain, self._update_mat)
         I_KHT = I_KH.T
         new_covariance = np.dot(I_KH, covariance) #simplified covariance update equation
