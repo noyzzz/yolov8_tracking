@@ -292,7 +292,7 @@ def run(
                 #if xyxy is out of the image or if any of them is nan, do not draw it 
                 if xyxy[0] < 0 or xyxy[1] < 0 or xyxy[2] > im0.shape[1] or xyxy[3] > im0.shape[0] or np.isnan(xyxy).any():
                     continue
-                annotator.box_label(xyxy, str(track_id), color=(255, 0, 0))
+                # annotator.box_label(xyxy, str(track_id), color=(255, 0, 0))
 
             if det is not None and len(det):  
                 # draw boxes for visualization

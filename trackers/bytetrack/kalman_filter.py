@@ -178,12 +178,16 @@ class KalmanFilter(object):
             # 1e-1,
             # self._std_weight_position 
         # ]
+        # std = [
+        #     np.abs(mean[0] - self.image_width/2)/30,
+        #     np.abs(mean[1] - self.image_height/2)/30,
+        #     1e-1,
+        #     1]
         std = [
-            np.abs(mean[0] - self.image_width/2)/30,
-            np.abs(mean[1] - self.image_height/2)/30,
-            1e-1,
-            1]
-
+            0.5,
+            0.10,
+            0.10,
+            0.10]
         innovation_cov = np.diag(np.square(std))
 
         # mean = H * x_hat 
@@ -209,14 +213,21 @@ class KalmanFilter(object):
             Returns the mean vector and covariance matrix of the predicted
             state. Unobserved velocities are initialized to 0 mean.
         """
+        #define x_dis_to_end, y_dis_to_end, x_dis_to_start, y_dis_to_start
+        x_dis_to_end = np.abs(self.image_width - mean[:, 0])
+        x_dis_to_start = np.abs(mean[:, 0])
+        #for each track find the maximum distance to the end of the image
+        x_dis_min = np.minimum(x_dis_to_end, x_dis_to_start)*10.0/self.image_width
+
+
         std_pos = [
-            self._std_weight_position * np.ones_like(mean[:, 3]),
-            self._std_weight_position * np.ones_like(mean[:, 3]),
+            self._std_weight_position * np.ones_like(mean[:, 3])* x_dis_min,
+            self._std_weight_position * np.ones_like(mean[:, 3]) * x_dis_min,
             1e-2 * np.ones_like(mean[:, 3]),
             self._std_weight_position * np.ones_like(mean[:, 3])]
         std_vel = [
-            self._std_weight_velocity * np.ones_like(mean[:, 3]),
-            self._std_weight_velocity * np.ones_like(mean[:, 3]),
+            self._std_weight_velocity * np.ones_like(mean[:, 3]) * x_dis_min,
+            self._std_weight_velocity * np.ones_like(mean[:, 3]) * x_dis_min,
             1e-5 * np.ones_like(mean[:, 3]),
             self._std_weight_velocity * np.ones_like(mean[:, 3])]
         
