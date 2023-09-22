@@ -331,7 +331,9 @@ def run(
                             label = None if hide_labels else (f'{id} {names[c]}' if hide_conf else \
                                 (f'{id} {conf:.2f}' if hide_class else f'{id} {names[c]} {conf:.2f}'))
                             color = colors(c, True)
-                            annotator.box_label(bbox, label, color=color)
+                            #if bbox is out of the image or if any of them is nan, do not draw it
+                            if not (bbox[0] < 0 or bbox[1] < 0 or bbox[2] > im0.shape[1] or bbox[3] > im0.shape[0] or np.isnan(bbox).any()):
+                                annotator.box_label(bbox, label, color=color)
                             
                             if save_trajectories and tracking_method == 'strongsort':
                                 q = output[7]

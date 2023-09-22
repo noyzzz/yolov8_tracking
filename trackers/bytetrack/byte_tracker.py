@@ -18,13 +18,14 @@ import datetime
 
 IMG_WIDTH = 640
 IMG_HEIGHT = 480
+FOCAL_LENGTH = 462.0
 
 class STrack(BaseTrack):
     current_yaw = 0;
     current_yaw_dot = 0;
     current_yaw_dot_filtered = 0;
     yaw_dot_list = deque(maxlen=2)
-    shared_kalman = KalmanFilter(IMG_WIDTH, IMG_HEIGHT, 462.0) #TODO check the parameters
+    shared_kalman = KalmanFilter(IMG_WIDTH, IMG_HEIGHT, FOCAL_LENGTH) #TODO check the parameters
     def __init__(self, tlwh, score, cls):
 
         # wait activate
@@ -53,7 +54,7 @@ class STrack(BaseTrack):
         STrack.yaw_dot_list.append(STrack.current_yaw_dot)
         STrack.current_yaw = yaw
         STrack.current_yaw_dot_filtered = np.mean(STrack.yaw_dot_list)
-        # print("current yaw is ", STrack.current_yaw)
+        print("current yaw is ", STrack.current_yaw)
 
     def predict(self):
         mean_state = self.mean.copy()
@@ -193,7 +194,7 @@ class BYTETracker(object):
         self.det_thresh = track_thresh + 0.1
         self.buffer_size = int(frame_rate / 30.0 * track_buffer)
         self.max_time_lost = 30000#self.buffer_size
-        self.kalman_filter = KalmanFilter(IMG_WIDTH, IMG_HEIGHT, 462.0) #TODO check the parameters
+        self.kalman_filter = KalmanFilter(IMG_WIDTH, IMG_HEIGHT, FOCAL_LENGTH) #TODO check the parameters
         self.use_depth = True
         self.use_odometry = True
         self.time_window_list = deque(maxlen=300)
@@ -400,6 +401,8 @@ class BYTETracker(object):
         # get scores of lost tracks
         output_stracks = [track for track in self.tracked_stracks if track.is_activated]
         outputs = []
+        test_all_stracks = joint_stracks(self.tracked_stracks, self.lost_stracks)
+        test_all_stracks = joint_stracks(test_all_stracks, self.removed_stracks)
         for t in output_stracks:
             output= []
             tlwh = t.tlwh
