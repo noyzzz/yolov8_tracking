@@ -16,8 +16,8 @@ import time
 from torch.utils.tensorboard import SummaryWriter
 import datetime
 
-IMG_WIDTH = 640
-IMG_HEIGHT = 480
+IMG_WIDTH = 960
+IMG_HEIGHT = 540
 FOCAL_LENGTH = 462.0
 
 class STrack(BaseTrack):
@@ -39,18 +39,22 @@ class STrack(BaseTrack):
         self.cls = cls
 
     def update_yaw(odom):
-        quaternion = (odom.pose.pose.orientation.x, odom.pose.pose.orientation.y,
-                odom.pose.pose.orientation.z, odom.pose.pose.orientation.w)
-        #get the yaw from the quaternion not using the tf library
-        yaw = np.arctan2(2.0 * (quaternion[3] * quaternion[2] + quaternion[0] * quaternion[1]),
-                         1.0 - 2.0 * (quaternion[1] * quaternion[1] + quaternion[2] * quaternion[2]))
+        quat = False
+        if quat:
+            quaternion = (odom.pose.pose.orientation.x, odom.pose.pose.orientation.y,
+                    odom.pose.pose.orientation.z, odom.pose.pose.orientation.w)
+            #get the yaw from the quaternion not using the tf library
+            yaw = np.arctan2(2.0 * (quaternion[3] * quaternion[2] + quaternion[0] * quaternion[1]),
+                            1.0 - 2.0 * (quaternion[1] * quaternion[1] + quaternion[2] * quaternion[2]))
+        else:
+            yaw = odom.pose.pose.orientation.z
         while  abs(yaw-STrack.current_yaw) > np.pi :
             if yaw < STrack.current_yaw :
                 yaw += 2*np.pi
             else:
                 yaw -= 2*np.pi
         twist = odom.twist.twist
-        STrack.current_yaw_dot = twist.angular.z / 31.0 # frames are being published at 31Hz in the simulator
+        STrack.current_yaw_dot = twist.angular.z / 31.0 # frames are being published at 20Hz in the simulator
         STrack.yaw_dot_list.append(STrack.current_yaw_dot)
         STrack.current_yaw = yaw
         STrack.current_yaw_dot_filtered = np.mean(STrack.yaw_dot_list)
