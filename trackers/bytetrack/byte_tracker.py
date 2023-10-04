@@ -18,7 +18,7 @@ import datetime
 
 IMG_WIDTH = 960
 IMG_HEIGHT = 540
-FOCAL_LENGTH = 462.0
+FOCAL_LENGTH = 480.0
 
 class STrack(BaseTrack):
     current_yaw = 0;
@@ -54,7 +54,7 @@ class STrack(BaseTrack):
             else:
                 yaw -= 2*np.pi
         twist = odom.twist.twist
-        STrack.current_yaw_dot = twist.angular.z / 31.0 # frames are being published at 20Hz in the simulator
+        STrack.current_yaw_dot = twist.angular.z / 27. # frames are being published at 20Hz in the simulator
         STrack.yaw_dot_list.append(STrack.current_yaw_dot)
         STrack.current_yaw = yaw
         STrack.current_yaw_dot_filtered = np.mean(STrack.yaw_dot_list)
@@ -406,8 +406,7 @@ class BYTETracker(object):
         output_stracks = [track for track in self.tracked_stracks if track.is_activated]
         outputs = []
         test_all_stracks = joint_stracks(self.tracked_stracks, self.lost_stracks)
-        test_all_stracks = joint_stracks(test_all_stracks, self.removed_stracks)
-        for t in output_stracks:
+        for t in test_all_stracks:
             output= []
             tlwh = t.tlwh
             tid = t.track_id

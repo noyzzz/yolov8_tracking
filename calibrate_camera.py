@@ -20,9 +20,9 @@ class F_values:
     __F_U_ROT = 10.0
     __F_U_TRANS = 10.0
     __F_V = 10.0
-    __F_U_ROT_SIM = 400.0
-    __F_U_TRANS_SIM = 400.0
-    __F_V_SIM = 400.0
+    __F_U_ROT_SIM = 480.0
+    __F_U_TRANS_SIM = 1600.0
+    __F_V_SIM = 480.0
     def get_u_rot(is_sim):
         if is_sim:
             return F_values.__F_U_ROT_SIM
@@ -204,8 +204,6 @@ class GetZOrientation:
             self.initial_v = self.circle_location[1]-center[1]
             self.initial_depth = self.current_depth
             self.initial_position = self.current_position
-            self.delta_x = 0
-            self.delta_y = 0
             # self.initial_rot_matrix = self.rot_matrix
 
         #if down arrow is pressed, decrease the f_u_rot by 10
@@ -222,13 +220,23 @@ class GetZOrientation:
 
         if pressed_key == ord('d'):
             print("D PRESSED")
-            F_values.increase_u_trans(self.is_sim)
-            print("f_u_trans: ", F_values.get_u_trans(self.is_sim))
+            F_values.decrease_u_rot(self.is_sim)
+            print("u_rot: ", F_values.get_u_rot(self.is_sim))
         #if up arrow is pressed, increase the f_u_trans by 10
         if pressed_key == ord('e'):
             print("E PRESSED")
+            F_values.increase_u_rot(self.is_sim)
+            print("u_rot: ", F_values.get_u_rot(self.is_sim))
+
+        if pressed_key == ord('f'):
+            print("D PRESSED")
+            F_values.decrease_u_trans(self.is_sim)
+            print("u_trans: ", F_values.get_u_trans(self.is_sim))
+        #if up arrow is pressed, increase the f_u_trans by 10
+        if pressed_key == ord('r'):
+            print("E PRESSED")
             F_values.increase_u_trans(self.is_sim)
-            print("f_u_trans: ", F_values.get_u_trans(self.is_sim))
+            print("u_trans: ", F_values.get_u_trans(self.is_sim))
 
         #if p is pressed, print the current estimated u and v
         if pressed_key == ord('p'):
@@ -236,46 +244,55 @@ class GetZOrientation:
             print("estimated u: ", self.last_u_estimate, "estimated v: ", self.last_v_estimate)
 
         
-        current_y = self.current_position[1]
-        current_x = self.current_position[0]
-        current_yaw = self.current_yaw
+        # current_y = self.current_position[1]
+        # current_x = self.current_position[0]
+        # current_yaw = self.current_yaw
 
-        if self.last_yaw is None or self.last_x is None or self.last_y is None:
-            self.last_yaw = current_yaw
-            self.last_x = current_x
-            self.last_y = current_y
-        diff_y = current_y-self.last_y
-        diff_x = current_x-self.last_x
+        # if self.last_yaw is None or self.last_x is None or self.last_y is None:
+        #     self.last_yaw = current_yaw
+        #     self.last_x = current_x
+        #     self.last_y = current_y
+        # diff_y = current_y-self.last_y
+        # diff_x = current_x-self.last_x
 
-        self.delta_x += diff_x*math.cos(current_yaw)-diff_y*math.sin(current_yaw)
-        self.delta_y += diff_x*math.sin(current_yaw)+diff_y*math.cos(current_yaw)
+        # self.delta_x += diff_x*math.cos(current_yaw)-diff_y*math.sin(current_yaw)
+        # self.delta_y += diff_x*math.sin(current_yaw)+diff_y*math.cos(current_yaw)
 
-        self.last_yaw = current_yaw
-        self.last_x = current_x
-        self.last_y = current_y
+        # self.last_yaw = current_yaw
+        # self.last_x = current_x
+        # self.last_y = current_y
 
-        # print("delta_x: ", self.delta_x, "delta_y: ", self.delta_y)
 
-        robot_movement = self.current_position-self.initial_position
-        robot_movement_3x1 = np.array([robot_movement[1], robot_movement[0], 0])
+        diff_x_odom = self.current_position[0]-self.initial_position[0]
+        diff_y_odom = self.current_position[1]-self.initial_position[1]
+        delta_yaw = self.current_yaw-self.initial_yaw
+        delta_x_car_frame = diff_x_odom*math.cos(self.initial_yaw)+diff_y_odom*math.sin(self.initial_yaw)
+        delta_y_car_frame = -diff_x_odom*math.sin(self.initial_yaw)+diff_y_odom*math.cos(self.initial_yaw)
+        
+
+        # print("delta_x: ", delta_x_car_frame, "delta_y: ", delta_y_car_frame, "delta_yaw: ", self.initial_yaw)
+
+        # robot_movement = self.current_position-self.initial_position
+        # robot_movement_3x1 = np.array([robot_movement[1], robot_movement[0], 0])
         # translation_b1 = np.matmul(self.initial_rot_matrix, robot_movement_3x1)
         # print("estimated u2 with translational move", self.estimate_trans_u2(self.initial_depth, distance, self.initial_u, 250.0))
-        superpos_estimate_u = (self.estimate_rot_u2((-1*(self.current_yaw-self.initial_yaw)), self.initial_u, F_values.get_u_rot(self.is_sim)) -
-                             self.initial_u) + self.estimate_trans_u2(self.initial_depth, -self.delta_x, self.initial_u, F_values.get_u_trans(self.is_sim))
+        superpos_estimate_u = (self.estimate_rot_u2(-(self.current_yaw-self.initial_yaw), self.initial_u, F_values.get_u_rot(self.is_sim)) -
+                             self.initial_u) + self.estimate_trans_u2(self.initial_depth, delta_x_car_frame, self.initial_u, F_values.get_u_trans(self.is_sim))
         
+        # superpos_estimate_u = self.estimate_trans_u2(self.initial_depth, delta_x_car_frame, self.initial_u, F_values.get_u_trans(self.is_sim))
         # superpos_estimate_u = self.estimate_rot_u2(-(self.current_yaw-self.initial_yaw), self.initial_u, F_values.get_u_rot(self.is_sim))
         # superpos_estimate_u = self.initial_u
-        superpos_estimate_v = self.estimate_trans_u2(self.initial_depth, -self.delta_x, self.initial_v, F_values.get_v(self.is_sim))
+        superpos_estimate_v = self.estimate_trans_u2(self.initial_depth, delta_x_car_frame, self.initial_v, F_values.get_v(self.is_sim))
 
         self.last_u_estimate = superpos_estimate_u
-        self.last_v_estimate = superpos_estimate_v
+        self.last_v_estimate =  superpos_estimate_v
 
         #draw a circle at last_u_estimate and last_v_estimate on self.last_image , the positions are wrt the center of the image so add the center of the image to the positions
         center = np.array([self.last_image.shape[1]/2, self.last_image.shape[0]/2])
         cv2.circle(self.last_image, (int(superpos_estimate_u+center[0]), int(superpos_estimate_v+center[1])), 10, (0, 0, 255), -1)
 
         #print image width and height
-        print("image width: ", self.last_image.shape[1], "image height: ", self.last_image.shape[0])
+        # print("image width: ", self.last_image.shape[1], "image height: ", self.last_image.shape[0])
 
  
         

@@ -203,13 +203,15 @@ def run(
         with dt[2]:
             if is_seg:
                 masks = []
-                p = non_max_suppression(preds[0], conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det, nm=32)
+                nms_dets_list = non_max_suppression(preds[0], conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det, nm=32)
                 proto = preds[1][-1]
             else:
-                p = non_max_suppression(preds, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+                nms_dets_list = non_max_suppression(preds, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+
+
             
         # Process detections
-        for i, det in enumerate(p):  # detections per image
+        for i, det in enumerate(nms_dets_list):  # detections per image
             seen += 1
             if webcam:  # bs >= 1
                 p, im0, _ = path[i], im0s[i].copy(), dataset.count
@@ -306,45 +308,44 @@ def run(
                             im_gpu=torch.as_tensor(im0, dtype=torch.float16).to(device).permute(2, 0, 1).flip(0).contiguous() /
                             255 if retina_masks else im[i]
                         )
-                        
-                    for j, (output) in enumerate(outputs[i]):
-                        
-                        bbox = output[0:4]
-                        id = output[4]
-                        cls = output[5]
-                        conf = output[6]
+                    
+            
 
-                        if save_txt:
-                            # to MOT format
-                            bbox_left = output[0]
-                            bbox_top = output[1]
-                            bbox_w = output[2] - output[0]
-                            bbox_h = output[3] - output[1]
-                            # Write MOT compliant results to file
-                            with open(txt_path + '.txt', 'a') as f:
-                                f.write(('%g ' * 10 + '\n') % (frame_idx + 1, id, bbox_left,  # MOT format
-                                                               bbox_top, bbox_w, bbox_h, -1, -1, -1, i))
+            for j, (output) in enumerate(outputs[i]):
+                
+                bbox = output[0:4]
+                id = output[4]
+                cls = output[5]
+                conf = output[6]
 
-                        if save_vid or save_crop or show_vid:  # Add bbox/seg to image
-                            c = int(cls)  # integer class
-                            id = int(id)  # integer id
-                            label = None if hide_labels else (f'{id} {names[c]}' if hide_conf else \
-                                (f'{id} {conf:.2f}' if hide_class else f'{id} {names[c]} {conf:.2f}'))
-                            color = colors(c, True)
-                            #if bbox is out of the image or if any of them is nan, do not draw it
-                            if not (bbox[0] < 0 or bbox[1] < 0 or bbox[2] > im0.shape[1] or bbox[3] > im0.shape[0] or np.isnan(bbox).any()):
-                                annotator.box_label(bbox, label, color=color)
+                if save_txt:
+                    # to MOT format
+                    bbox_left = output[0]
+                    bbox_top = output[1]
+                    bbox_w = output[2] - output[0]
+                    bbox_h = output[3] - output[1]
+                    # Write MOT compliant results to file
+                    with open(txt_path + '.txt', 'a') as f:
+                        f.write(('%g ' * 10 + '\n') % (frame_idx + 1, id, bbox_left,  # MOT format
+                                                        bbox_top, bbox_w, bbox_h, -1, -1, -1, i))
+
+                if save_vid or save_crop or show_vid:  # Add bbox/seg to image
+                    c = int(cls)  # integer class
+                    id = int(id)  # integer id
+                    label = None if hide_labels else (f'{id} {names[c]}' if hide_conf else \
+                        (f'{id} {conf:.2f}' if hide_class else f'{id} {names[c]} {conf:.2f}'))
+                    color = colors(c, True)
+                    #if bbox is out of the image or if any of them is nan, do not draw it
+                    if not (bbox[0] < 0 or bbox[1] < 0 or bbox[2] > im0.shape[1] or bbox[3] > im0.shape[0] or np.isnan(bbox).any()):
+                        annotator.box_label(bbox, label, color=color)
+                    
+                    if save_trajectories and tracking_method == 'strongsort':
+                        q = output[7]
+                        tracker_list[i].trajectory(im0, q, color=color)
+                    if save_crop:
+                        txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
+                        save_one_box(np.array(bbox, dtype=np.int16), imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
                             
-                            if save_trajectories and tracking_method == 'strongsort':
-                                q = output[7]
-                                tracker_list[i].trajectory(im0, q, color=color)
-                            if save_crop:
-                                txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
-                                save_one_box(np.array(bbox, dtype=np.int16), imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
-                            
-            else:
-                pass
-                #tracker_list[i].tracker.pred_n_update_all_tracks()
                 
             # Stream results
             im0 = annotator.result()
