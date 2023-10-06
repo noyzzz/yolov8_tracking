@@ -127,6 +127,11 @@ class STrack(BaseTrack):
         if new_track is not None:
             self.state = TrackState.Tracked
             self.is_activated = True
+
+    
+    def update_dummy(self):
+        self.mean, self.covariance = self.kalman_filter.update_dummy(
+            self.mean, self.covariance)
             
 
     @property
@@ -197,7 +202,7 @@ class BYTETracker(object):
         self.match_thresh = match_thresh
         self.det_thresh = track_thresh + 0.1
         self.buffer_size = int(frame_rate / 30.0 * track_buffer)
-        self.max_time_lost = 30000#self.buffer_size
+        self.max_time_lost = self.buffer_size*10
         self.kalman_filter = KalmanFilter(IMG_WIDTH, IMG_HEIGHT, FOCAL_LENGTH) #TODO check the parameters
         self.use_depth = True
         self.use_odometry = True
@@ -361,6 +366,7 @@ class BYTETracker(object):
 
         for it in u_track:
             track = r_tracked_stracks[it]
+            track.update_dummy()
             if not track.state == TrackState.Lost:
                 track.mark_lost()
                 lost_stracks.append(track)
@@ -405,7 +411,11 @@ class BYTETracker(object):
         # get scores of lost tracks
         output_stracks = [track for track in self.tracked_stracks if track.is_activated]
         outputs = []
-        test_all_stracks = joint_stracks(self.tracked_stracks, self.lost_stracks)
+        #copy self.lost_stracks and change the class of the tracks to -1
+        local_lost_stracks = copy.deepcopy(self.lost_stracks)
+        for track in local_lost_stracks:
+            track.cls = -1
+        test_all_stracks = joint_stracks(self.tracked_stracks, local_lost_stracks)
         for t in test_all_stracks:
             output= []
             tlwh = t.tlwh

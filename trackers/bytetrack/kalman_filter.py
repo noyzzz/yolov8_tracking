@@ -235,9 +235,6 @@ class KalmanFilter(object):
 
         for i in range(len(mean)):
             this_motion_cov = np.diag(sqr[i])
-            ###FOR TEST - SET ALL vel terms in mean to 0
-            mean[i][4:] = 0
-            ###END OF FOR TEST - SET ALL vel terms in mean to 0
             this_motion_mat = self.calculate_motion_mat(mean[i])
             this_control_mat = self.calculate_control_mat(mean[i])
             mean[i] = np.dot(mean[i], this_motion_mat.T) + np.dot(control_signal, this_control_mat.T)
@@ -274,9 +271,6 @@ class KalmanFilter(object):
         #     mean[4] = measurement[4]
         #     print(measurement[4])
         #     return mean, covariance
-        ###FOR TEST - SET ALL vel terms in mean to 0
-        mean[4:] = 0
-        ###END OF FOR TEST - SET ALL vel terms in mean to 0
         projected_mean, projected_cov = self.project(mean, covariance)
         PHT = np.dot(covariance, self._update_mat.T)
         SI = np.linalg.inv(projected_cov)
@@ -298,6 +292,11 @@ class KalmanFilter(object):
 
 
         return new_mean, new_covariance
+    
+    def update_dummy(self, mean, covariance):
+        mean[4:] = 0.0
+        return mean, covariance
+
 
     def gating_distance(self, mean, covariance, measurements,
                         only_position=False, metric='maha'):

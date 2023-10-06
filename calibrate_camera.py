@@ -178,8 +178,8 @@ class GetZOrientation:
         # B = ((d1+D)*tan(gamma/2))/(d1-D)
         B = (d1+D)*math.tan(gamma/2)/(d1-D)
         # gamma2_tan = (tan(gamma/2) + B)/(1-tan(gamma/2)*B)
-        gamma2 = (math.tan(gamma/2) + B)/(1-math.tan(gamma/2)*B)
-        return f*gamma2
+        gamma2_tan = (math.tan(gamma/2) + B)/(1-math.tan(gamma/2)*B)
+        return f*gamma2_tan
 
     def image_callback(self, data):
         # convert image to cv2 image
@@ -195,6 +195,7 @@ class GetZOrientation:
             # if 'a' is pressed, print the current yaw
             print("A PRESSED")
             self.current_depth = self.depth_image[self.circle_location[1], self.circle_location[0]]
+            print("current depth: ", self.current_depth)
             print("current yaw: ", math.degrees(get_z_orientation.current_yaw))
             self.initial_yaw = self.current_yaw
             #initial u and initial v should be with respect to the center of the image
@@ -266,8 +267,10 @@ class GetZOrientation:
         diff_x_odom = self.current_position[0]-self.initial_position[0]
         diff_y_odom = self.current_position[1]-self.initial_position[1]
         delta_yaw = self.current_yaw-self.initial_yaw
-        delta_x_car_frame = diff_x_odom*math.cos(self.initial_yaw)+diff_y_odom*math.sin(self.initial_yaw)
-        delta_y_car_frame = -diff_x_odom*math.sin(self.initial_yaw)+diff_y_odom*math.cos(self.initial_yaw)
+        delta_x_car_frame = diff_x_odom*math.cos(self.current_yaw)+diff_y_odom*math.sin(self.current_yaw)
+        delta_y_car_frame = -diff_x_odom*math.sin(self.current_yaw)+diff_y_odom*math.cos(self.current_yaw)
+        #print the three values with 3 decimal points of precision, format the string with f-strings
+        # print(f"delta_x: {delta_x_car_frame:.3f} delta_y: {delta_y_car_frame:.3f} delta_yaw: {delta_yaw:.3f}")
         
 
         # print("delta_x: ", delta_x_car_frame, "delta_y: ", delta_y_car_frame, "delta_yaw: ", self.initial_yaw)
@@ -276,8 +279,28 @@ class GetZOrientation:
         # robot_movement_3x1 = np.array([robot_movement[1], robot_movement[0], 0])
         # translation_b1 = np.matmul(self.initial_rot_matrix, robot_movement_3x1)
         # print("estimated u2 with translational move", self.estimate_trans_u2(self.initial_depth, distance, self.initial_u, 250.0))
-        superpos_estimate_u = (self.estimate_rot_u2(-(self.current_yaw-self.initial_yaw), self.initial_u, F_values.get_u_rot(self.is_sim)) -
-                             self.initial_u) + self.estimate_trans_u2(self.initial_depth, delta_x_car_frame, self.initial_u, F_values.get_u_trans(self.is_sim))
+
+
+        #set theta as the angle between the current position and initial_position
+        theta = math.atan((self.current_position[1]-self.initial_position[1])/(self.current_position[0]-self.initial_position[0]))
+        #if theta is nan, set it to 0
+        if math.isnan(theta):
+            theta = 0
+        # print("theta: ", theta, 'y:  ', self.current_position[1]-self.initial_position[1],'x: ', self.current_position[0]-self.initial_position[0],)
+        first_rot_angle =  -(-self.initial_yaw + theta)
+        trans_mov = np.sqrt((self.current_position[0]-self.initial_position[0])**2+(self.current_position[1]-self.initial_position[1])**2)
+        second_rot_angle =  -(-theta + self.current_yaw)
+        first_estimate = self.estimate_rot_u2(first_rot_angle, self.initial_u, F_values.get_u_rot(self.is_sim))
+        second_estimate = self.estimate_trans_u2(self.initial_depth, delta_x_car_frame, first_estimate, F_values.get_u_trans(self.is_sim))
+        third_estimate = self.estimate_rot_u2(second_rot_angle, second_estimate, F_values.get_u_rot(self.is_sim))
+        print("x_diff", delta_x_car_frame, "Eucidean dis", trans_mov,\
+            "first estimate: ", first_estimate, "second estimate: ", second_estimate, "third estimate: ", third_estimate)
+
+        estimate_u_pure_rot = self.estimate_rot_u2(-(self.current_yaw-self.initial_yaw), self.initial_u, F_values.get_u_rot(self.is_sim))
+        estimate_u_trans_post_rot = self.estimate_trans_u2(self.initial_depth, delta_x_car_frame, estimate_u_pure_rot, F_values.get_u_trans(self.is_sim))
+        superpos_estimate_u = third_estimate
+        # superpos_estimate_u = (self.estimate_rot_u2(-(self.current_yaw-self.initial_yaw), self.initial_u, F_values.get_u_rot(self.is_sim)) -
+        #                      self.initial_u) + self.estimate_trans_u2(self.initial_depth, delta_x_car_frame, self.initial_u, F_values.get_u_trans(self.is_sim))
         
         # superpos_estimate_u = self.estimate_trans_u2(self.initial_depth, delta_x_car_frame, self.initial_u, F_values.get_u_trans(self.is_sim))
         # superpos_estimate_u = self.estimate_rot_u2(-(self.current_yaw-self.initial_yaw), self.initial_u, F_values.get_u_rot(self.is_sim))

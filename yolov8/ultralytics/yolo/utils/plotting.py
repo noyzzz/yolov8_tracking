@@ -29,6 +29,10 @@ class Colors:
         self.n = len(self.palette)
 
     def __call__(self, i, bgr=False):
+        #if i is -1 the color is black (lost track)
+        if i == -1:
+            c = (0, 0, 0)
+            return (c[2], c[1], c[0]) if bgr else c
         c = self.palette[int(i) % self.n]
         return (c[2], c[1], c[0]) if bgr else c
 
