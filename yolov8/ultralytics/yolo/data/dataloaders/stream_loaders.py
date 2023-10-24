@@ -141,7 +141,6 @@ class LoadStreams:
         if not all(x.is_alive() for x in self.threads) or cv2.waitKey(1) == ord('q'):  # q to quit
             cv2.destroyAllWindows()
             raise StopIteration
-
         im0 = self.imgs.copy()
 
 
@@ -161,6 +160,7 @@ class LoadStreams:
                     reset_signal = self.sources[0].sim_reset_queue.get()
                 self.reset_signal = reset_signal
 
+
             #do the same for the depth image queue
             # self.depth_image = None
             if self.sources[0].depth_image_queue.qsize() > 0:
@@ -170,6 +170,7 @@ class LoadStreams:
 
             #do the same for the odom queue
             self.odom = None
+            # while self.sources[0].odom_queue.qsize() == 0: pass #FIXME: this is a hack to make sure the odom queue is not empty (for logging)
             if self.sources[0].odom_queue.qsize() > 0:
                 while(self.sources[0].odom_queue.qsize() > 0):
                     odom = self.sources[0].odom_queue.get()

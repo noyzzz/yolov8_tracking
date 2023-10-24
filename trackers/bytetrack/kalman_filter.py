@@ -8,6 +8,10 @@ Table for the 0.95 quantile of the chi-square distribution with N degrees of
 freedom (contains values for N=1, ..., 9). Taken from MATLAB/Octave's chi2inv
 function and used as Mahalanobis gating threshold.
 """
+
+import rospy
+#import ros float array type
+from std_msgs.msg import Float32MultiArray
 chi2inv95 = {
     1: 3.8415,
     2: 5.9915,
@@ -56,21 +60,45 @@ class KalmanFilter(object):
         # Motion and observation uncertainty are chosen relative to the current
         # state estimate. These weights control the amount of uncertainty in
         # the model. This is a bit hacky.
-        self._std_weight_position = 20.0#1. / 20
-        self._std_weight_velocity = 10.0#1. / 160
+
+        
+        self._q1 = 1./10
+        self._q4 = 1./50
+        self._r1 = 1
+
+
+        self._r4 = 10.0
+        params_array = Float32MultiArray()
+        params_array.data = [self._q1, self._q4, self._r1, self._r4]
+        
 
     def calculate_motion_mat(self, mean):
-        return self._motion_mat
+        
         # u1 = mean[0] - self.image_width/2
         # robot_yaw_to_pixel_coeff = (u1**2/self.focal_length**2 + 1)*self.focal_length
         # self._motion_mat[0, 2*self.ndim-1] = robot_yaw_to_pixel_coeff*self.dt
         # return self._motion_mat\
+        return self._motion_mat
 
     def calculate_control_mat(self, mean):
         u1 = mean[0] - self.image_width/2
         robot_yaw_to_pixel_coeff = (u1**2/self.focal_length**2 + 1)*self.focal_length
         self.control_mat[0, 0] = robot_yaw_to_pixel_coeff*self.dt
         return self.control_mat
+    
+    def calculate_depth_control_mat(self, mean, control_signal):
+        u1 = mean[0] - self.image_width/2
+        v1 = mean[1] - self.image_height/2
+        bottom_y = v1 + mean[3]/2 #bottom right corner y wrt image center
+        u_coeff = u1*np.sqrt(u1**2 + self.focal_length**2)/(self.focal_length * control_signal[2])
+        v_coeff = v1*np.sqrt(v1**2 + self.focal_length**2)/(self.focal_length * control_signal[2])
+        h_coeff = (bottom_y*np.sqrt(bottom_y**2 + self.focal_length**2) - v1*np.sqrt(v1**2 + self.focal_length**2))\
+                   /(self.focal_length * control_signal[2])
+        depth_control_mat = np.zeros((2 * self.ndim, 1))
+        depth_control_mat[0, 0] = u_coeff
+        depth_control_mat[1, 0] = v_coeff
+        depth_control_mat[3, 0] = h_coeff
+        return depth_control_mat
 
 
     def initiate(self, measurement):
@@ -95,15 +123,16 @@ class KalmanFilter(object):
         mean = np.r_[mean_pos, mean_vel]
 
         std = [
-            2 * self._std_weight_position * measurement[3],
-            2 * self._std_weight_position * measurement[3],
+            self._r1  * measurement[3],
+            self._r1  * measurement[3],
             1e-2,
-            2 * self._std_weight_position * measurement[3],
-            10 * self._std_weight_velocity * measurement[3],
-            10 * self._std_weight_velocity * measurement[3],
+            self._r1  * measurement[3],
+            self._r4  * measurement[3],
+            self._r4  * measurement[3],
             1e-5,
-            10 * self._std_weight_velocity * measurement[3]
+            self._r4  * measurement[3]
             ]
+        
         covariance = np.diag(np.square(std))
         return mean, covariance
 
@@ -131,15 +160,15 @@ class KalmanFilter(object):
         """
         # Process noise standard deviation
         std_pos = [
-            self._std_weight_position ,
-            self._std_weight_position ,
+            self._q1 ,
+            self._q1 ,
             1e-2,
-            self._std_weight_position ] 
+            self._q1 ] 
         std_vel = [
-            self._std_weight_velocity ,
-            self._std_weight_velocity ,
+            self._q4 ,
+            self._q4 ,
             1e-5,
-            self._std_weight_velocity ]
+            self._q4 ]
                 
         motion_cov = np.diag(np.square(np.r_[std_pos, std_vel]))
 
@@ -184,10 +213,10 @@ class KalmanFilter(object):
         #     1e-1,
         #     1]
         std = [
-            0.5,
-            0.10,
-            0.10,
-            0.10]
+            self._r1,
+            self._r1,
+            0.50,
+            self._r1]
         innovation_cov = np.diag(np.square(std))
 
         # mean = H * x_hat 
@@ -207,6 +236,9 @@ class KalmanFilter(object):
         covariance : ndarray
             The Nx8x8 dimensional covariance matrics of the object states at the
             previous time step.
+        control_signal : ndarray
+            The Nx3 dimensional control signal vector that contains the robot's
+            yaw velocity, forward tranlational velocity and distance to the objects.
         Returns
         -------
         (ndarray, ndarray)
@@ -221,15 +253,15 @@ class KalmanFilter(object):
 
 
         std_pos = [
-            self._std_weight_position * np.ones_like(mean[:, 3])* x_dis_min,
-            self._std_weight_position * np.ones_like(mean[:, 3]) * x_dis_min,
+            self._q1 * np.ones_like(mean[:, 3]),
+            self._q1 * np.ones_like(mean[:, 3]) ,
             1e-2 * np.ones_like(mean[:, 3]),
-            self._std_weight_position * np.ones_like(mean[:, 3])]
+            self._q1 * np.ones_like(mean[:, 3])]
         std_vel = [
-            self._std_weight_velocity * np.ones_like(mean[:, 3]) * x_dis_min,
-            self._std_weight_velocity * np.ones_like(mean[:, 3]) * x_dis_min,
+            self._q4 * np.ones_like(mean[:, 3]) ,
+            self._q4 * np.ones_like(mean[:, 3]) ,
             1e-5 * np.ones_like(mean[:, 3]),
-            self._std_weight_velocity * np.ones_like(mean[:, 3])]
+            self._q4 * np.ones_like(mean[:, 3])]
         
         sqr = np.square(np.r_[std_pos, std_vel]).T
 
@@ -237,7 +269,10 @@ class KalmanFilter(object):
             this_motion_cov = np.diag(sqr[i])
             this_motion_mat = self.calculate_motion_mat(mean[i])
             this_control_mat = self.calculate_control_mat(mean[i])
-            mean[i] = np.dot(mean[i], this_motion_mat.T) + np.dot(control_signal, this_control_mat.T)
+            mean_rot_applied = np.dot(control_signal[i][0], this_control_mat.T)[0]
+            depth_control_mat = self.calculate_depth_control_mat(mean[i], control_signal[i])
+            mean_trans_applied = 0#np.dot(control_signal[i][1], depth_control_mat.T)[0]
+            mean[i] = np.dot(mean[i], this_motion_mat.T) + mean_trans_applied + mean_rot_applied
             covariance[i] = np.linalg.multi_dot((
                 this_motion_mat, covariance[i], this_motion_mat.T)) + this_motion_cov
 
@@ -293,8 +328,10 @@ class KalmanFilter(object):
 
         return new_mean, new_covariance
     
-    def update_dummy(self, mean, covariance):
-        mean[4:] = 0.0
+    def update_dummy(self, mean, covariance, yaw_dot): #FIXME: this is a dummy update function
+        mean[4:] = 1/(5+1000*yaw_dot) * mean[4:]
+        mean[5] = 1/(10+1000*yaw_dot) * mean[5]
+        mean[6] = 0
         return mean, covariance
 
 

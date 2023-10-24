@@ -29,6 +29,7 @@ import numpy as np
 from pathlib import Path
 import torch
 import torch.backends.cudnn as cudnn
+import subprocess
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # yolov5 strongsort root directory
@@ -56,6 +57,22 @@ from yolov8.ultralytics.yolo.utils.plotting import Annotator, colors, save_one_b
 
 from trackers.multi_tracker_zoo import create_tracker
 from ros_classes import image_converter
+
+def play_bag(is_ros_bag):
+    if is_ros_bag:
+        player_state = subprocess.Popen(["rosbag", "play", "-l", "/home/rosen/tracking_catkin_ws/src/my_tracker/bags/carla_stationary_obj_slow.bag"])
+
+def get_intersection(bbox, image_bbox):
+    """
+    bbox: [x1, y1, x2, y2]
+    image_bbox: [x1, y1, x2, y2]
+    """
+    x1 = max(bbox[0], image_bbox[0])
+    y1 = max(bbox[1], image_bbox[1])
+    x2 = min(bbox[2], image_bbox[2])
+    y2 = min(bbox[3], image_bbox[3])
+    intersection = (x2 - x1) * (y2 - y1)
+    return intersection
 
 @torch.no_grad()
 def run(
@@ -92,7 +109,8 @@ def run(
         dnn=False,  # use OpenCV DNN for ONNX inference
         vid_stride=1,  # video frame-rate stride
         retina_masks=False,
-        ros_package = 0
+        ros_package = 0,
+        ros_bag = 1,
 ):
     is_ros = isinstance(source, image_converter)
     #copy source to avoid changing the original
@@ -335,8 +353,18 @@ def run(
                     label = None if hide_labels else "NO DET  " + str(id) if c == -1 else (f'{id} {names[c]}' if hide_conf else \
                         (f'{id} {conf:.2f}' if hide_class else f'{id} {names[c]} {conf:.2f}'))
                     color = colors(c, True)
+
+                    #check if bbox has any intersection with the image and give the intersection
+                    intersection = get_intersection(bbox, [0, 0, im0.shape[1], im0.shape[0]])
+
                     #if bbox is out of the image or if any of them is nan, do not draw it
-                    if not (bbox[0] < 0 or bbox[1] < 0 or bbox[2] > im0.shape[1] or bbox[3] > im0.shape[0] or np.isnan(bbox).any()):
+                        #clip the bbox to the image
+                    bbox[0] = np.clip(bbox[0], 0, im0.shape[1])
+                    bbox[1] = np.clip(bbox[1], 0, im0.shape[0])
+                    bbox[2] = np.clip(bbox[2], 0, im0.shape[1])
+                    bbox[3] = np.clip(bbox[3], 0, im0.shape[0])
+                    #if nan, do not draw it
+                    if not np.isnan(bbox).any() and intersection > 0:
                         annotator.box_label(bbox, label, color=color)
                     
                     if save_trajectories and tracking_method == 'strongsort':
@@ -449,6 +477,7 @@ def parse_opt():
     parser.add_argument('--vid-stride', type=int, default=1, help='video frame-rate stride')
     parser.add_argument('--retina-masks', action='store_true', help='whether to plot masks in native resolution')
     parser.add_argument('--ros-package', type=str, default='0', help='is this running in a ros package')
+    parser.add_argument('--ros-bag', type=str, default='0', help='run ros bag')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     opt.tracking_config = ROOT / 'trackers' / opt.tracking_method / 'configs' / (opt.tracking_method + '.yaml')
@@ -467,6 +496,7 @@ def ros_init(is_ros_package=0):
     # cv2.destroyAllWindows()
 
 def main(opt):
+    play_bag(int(opt.ros_bag))
     check_requirements(requirements=ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
     ic = ros_init(int(opt.ros_package))
     opt.source = ic

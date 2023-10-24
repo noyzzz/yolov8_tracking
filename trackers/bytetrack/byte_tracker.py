@@ -5,7 +5,7 @@ import os.path as osp
 import copy
 import torch
 import torch.nn.functional as F
-
+from typing import List, Tuple, Dict
 from yolov8.ultralytics.yolo.utils.ops import xywh2xyxy, xyxy2xywh
 
 
@@ -24,6 +24,7 @@ class STrack(BaseTrack):
     current_yaw = 0;
     current_yaw_dot = 0;
     current_yaw_dot_filtered = 0;
+    current_depth_image = None
     yaw_dot_list = deque(maxlen=2)
     shared_kalman = KalmanFilter(IMG_WIDTH, IMG_HEIGHT, FOCAL_LENGTH) #TODO check the parameters
     def __init__(self, tlwh, score, cls):
@@ -38,7 +39,28 @@ class STrack(BaseTrack):
         self.tracklet_len = 0
         self.cls = cls
 
-    def update_yaw(odom):
+
+    def get_d1(self):
+        #calculate the depth of the object in the depth image
+        #get the bounding box of the object in the depth image
+        #get the median of the depth values in the bounding box excluding the zeros and the nans
+        #return the depth value
+        bounding_box = copy.deepcopy(self.tlwh)
+        #get the depth of the bounding box in the depth image
+        #clip the bounding box to the image size and remove the negative values
+        bounding_box[bounding_box < 0] = 0
+        bounding_box[np.isnan(bounding_box)] = 0
+        track_depth = copy.deepcopy(STrack.current_depth_image)[int(bounding_box[1]):int(bounding_box[1]+bounding_box[3]), int(bounding_box[0]):int(bounding_box[0]+bounding_box[2])]
+        #get the median of the depth values in the bounding box excluding the zeros and the nans
+        track_depth = track_depth[track_depth != 0]
+        track_depth = track_depth[~np.isnan(track_depth)]
+        return np.median(track_depth)
+    
+
+    def update_depth_image(depth_image):
+        STrack.current_depth_image = depth_image
+
+    def update_ego_motion(odom, fps):
         quat = False
         if quat:
             quaternion = (odom.pose.pose.orientation.x, odom.pose.pose.orientation.y,
@@ -54,11 +76,16 @@ class STrack(BaseTrack):
             else:
                 yaw -= 2*np.pi
         twist = odom.twist.twist
-        STrack.current_yaw_dot = twist.angular.z / 27. # frames are being published at 20Hz in the simulator
+        STrack.current_yaw_dot = twist.angular.z / fps # frames are being published at 20Hz in the simulator
         STrack.yaw_dot_list.append(STrack.current_yaw_dot)
         STrack.current_yaw = yaw
         STrack.current_yaw_dot_filtered = np.mean(STrack.yaw_dot_list)
-        print("current yaw is ", STrack.current_yaw)
+        raw_x_dot = twist.linear.x
+        raw_y_dot = twist.linear.y
+        x_dot = raw_x_dot*np.cos(STrack.current_yaw)+raw_y_dot*np.sin(STrack.current_yaw)
+        y_dot = -raw_x_dot*np.sin(STrack.current_yaw)+raw_y_dot*np.cos(STrack.current_yaw)
+        STrack.current_D_dot = x_dot / fps
+        # print("current y_dot is ", y_dot, "   current_x_dot is ", x_dot)
 
     def predict(self):
         mean_state = self.mean.copy()
@@ -74,7 +101,9 @@ class STrack(BaseTrack):
             for i, st in enumerate(stracks):
                 if st.state != TrackState.Tracked:
                     multi_mean[i][7] = 0
-            multi_mean, multi_covariance = STrack.shared_kalman.multi_predict(multi_mean, multi_covariance, np.array([STrack.current_yaw_dot]))
+            # create a n*3 array of yaw_dot, current_D_dot and depth
+            control_input = np.array([[STrack.current_yaw_dot, STrack.current_D_dot, st.get_d1() ]for st in stracks])
+            multi_mean, multi_covariance = STrack.shared_kalman.multi_predict(multi_mean, multi_covariance, control_input)
             for i, (mean, cov) in enumerate(zip(multi_mean, multi_covariance)):
                 stracks[i].mean = mean
                 stracks[i].covariance = cov
@@ -131,7 +160,7 @@ class STrack(BaseTrack):
     
     def update_dummy(self):
         self.mean, self.covariance = self.kalman_filter.update_dummy(
-            self.mean, self.covariance)
+            self.mean, self.covariance, STrack.current_yaw_dot)
             
 
     @property
@@ -191,10 +220,10 @@ class STrack(BaseTrack):
 
 class BYTETracker(object):
     def __init__(self, track_thresh=0.45, match_thresh=0.8, track_buffer=25, frame_rate=30):
+        self.last_time_stamp = time.time() #time in seconds
         self.tracked_stracks = []  # type: list[STrack]
         self.lost_stracks = []  # type: list[STrack]
         self.removed_stracks = []  # type: list[STrack]
-
         self.frame_id = 0
         self.track_buffer=track_buffer
         
@@ -202,14 +231,15 @@ class BYTETracker(object):
         self.match_thresh = match_thresh
         self.det_thresh = track_thresh + 0.1
         self.buffer_size = int(frame_rate / 30.0 * track_buffer)
-        self.max_time_lost = self.buffer_size*10
+        self.max_time_lost = self.buffer_size*100
         self.kalman_filter = KalmanFilter(IMG_WIDTH, IMG_HEIGHT, FOCAL_LENGTH) #TODO check the parameters
         self.use_depth = True
         self.use_odometry = True
         self.time_window_list = deque(maxlen=300)
         self.last_time = time.time()
         #initialize self.writer tensorboard writer
-        self.writer = SummaryWriter(f"./runs/large_R_{datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}")
+        self.writer = SummaryWriter(f"./runs/slow/{self.kalman_filter._q1:0.3f}_{self.kalman_filter._q4:0.5f}_{self.kalman_filter._r1:0.3f}\
+                                    __{datetime.datetime.now().strftime('%Y-%m-%d_%H:%M')}")
 
     def get_all_track_predictions(self):
         """
@@ -224,10 +254,16 @@ class BYTETracker(object):
             bboxes.append(bbox)
         return bboxes
 
-        
+    def update_time(self):
+        time_now = time.time()
+        self.fps = 1.0/(time_now - self.last_time_stamp)
+        print("fps is ", self.fps)
+        self.last_time_stamp = time_now
 
     def update(self, dets, color_image, depth_image = None, odom = None, masks = None):
-        STrack.update_yaw(odom)
+        self.update_time()
+        STrack.update_ego_motion(odom,self.fps)
+        STrack.update_depth_image(depth_image)
         #get the current time and compare it with the last time update was called
         time_now = time.time()
         self.time_window_list.append(1.0/(time_now - self.last_time))
@@ -295,32 +331,33 @@ class BYTETracker(object):
             # print (f"track id: , {track_print.track_id:>5},  x_dot:  , {100*track_print.mean[4]:>5.2f}, x_cov:  {track_print.covariance[0,0]:>5.2f} , current_yaw_dot:   {100*STrack.current_yaw_dot:>5.2f}", flush=True)
         
     #take log from the track means and covariances and visualize them in tensorboard
-        for track in tracked_stracks:
+        for track in joint_stracks(self.tracked_stracks, self.lost_stracks):
             track_id = track.track_id
             mean = track.mean
             covariance = track.covariance
-            self.writer.add_scalar(f"loc/Track {track_id} x", mean[0], self.frame_id)
-            self.writer.add_scalar(f"loc/Track {track_id} y", mean[1], self.frame_id)
-            self.writer.add_scalar(f"loc/Track {track_id} a", mean[2], self.frame_id)
-            self.writer.add_scalar(f"loc/Track {track_id} h", mean[3], self.frame_id)
-            self.writer.add_scalar(f"vel/Track {track_id} x_dot", mean[4], self.frame_id)
-            self.writer.add_scalar(f"vel/Track {track_id} y_dot", mean[5], self.frame_id)
-            self.writer.add_scalar(f"vel/Track {track_id} a_dot", mean[6], self.frame_id)
-            self.writer.add_scalar(f"vel/Track {track_id} h_dot", mean[7], self.frame_id)
-            self.writer.add_scalar(f"loc_cov/Track {track_id} x_cov", covariance[0,0], self.frame_id)
-            self.writer.add_scalar(f"loc_cov/Track {track_id} y_cov", covariance[1,1], self.frame_id)
-            self.writer.add_scalar(f"loc_cov/Track {track_id} a_cov", covariance[2,2], self.frame_id)
-            self.writer.add_scalar(f"loc_cov/Track {track_id} h_cov", covariance[3,3], self.frame_id)
-            self.writer.add_scalar(f"vel_cov/Track {track_id} x_dot_cov", covariance[4,4], self.frame_id)
-            self.writer.add_scalar(f"vel_cov/Track {track_id} y_dot_cov", covariance[5,5], self.frame_id)
-            self.writer.add_scalar(f"vel_cov/Track {track_id} a_dot_cov", covariance[6,6], self.frame_id)
-            self.writer.add_scalar(f"vel_cov/Track {track_id} h_dot_cov", covariance[7,7], self.frame_id)
-            # self.writer.add_scalar("vel/current_yaw_dot/raw", STrack.current_yaw_dot, self.frame_id)
-            self.writer.add_scalars('current_yaw_dot', {'raw': STrack.current_yaw_dot,
-                                                        'filtered': STrack.current_yaw_dot_filtered}, self.frame_id)
-            # self.writer.add_scalar(f"vel/current_yaw_dot_filtered", STrack.current_yaw_dot_filtered, self.frame_id)
-            #flush the writer
-            self.writer.flush()
+            if self.writer:
+                self.writer.add_scalar(f"loc/Track {track_id} x", mean[0], self.frame_id)
+                self.writer.add_scalar(f"loc/Track {track_id} y", mean[1], self.frame_id)
+                self.writer.add_scalar(f"loc/Track {track_id} a", mean[2], self.frame_id)
+                self.writer.add_scalar(f"loc/Track {track_id} h", mean[3], self.frame_id)
+                self.writer.add_scalar(f"vel/Track {track_id} x_dot", mean[4], self.frame_id)
+                self.writer.add_scalar(f"vel/Track {track_id} y_dot", mean[5], self.frame_id)
+                self.writer.add_scalar(f"vel/Track {track_id} a_dot", mean[6], self.frame_id)
+                self.writer.add_scalar(f"vel/Track {track_id} h_dot", mean[7], self.frame_id)
+                self.writer.add_scalar(f"loc_cov/Track {track_id} x_cov", covariance[0,0], self.frame_id)
+                self.writer.add_scalar(f"loc_cov/Track {track_id} y_cov", covariance[1,1], self.frame_id)
+                self.writer.add_scalar(f"loc_cov/Track {track_id} a_cov", covariance[2,2], self.frame_id)
+                self.writer.add_scalar(f"loc_cov/Track {track_id} h_cov", covariance[3,3], self.frame_id)
+                self.writer.add_scalar(f"vel_cov/Track {track_id} x_dot_cov", covariance[4,4], self.frame_id)
+                self.writer.add_scalar(f"vel_cov/Track {track_id} y_dot_cov", covariance[5,5], self.frame_id)
+                self.writer.add_scalar(f"vel_cov/Track {track_id} a_dot_cov", covariance[6,6], self.frame_id)
+                self.writer.add_scalar(f"vel_cov/Track {track_id} h_dot_cov", covariance[7,7], self.frame_id)
+                # self.writer.add_scalar("vel/current_yaw_dot/raw", STrack.current_yaw_dot, self.frame_id)
+                # self.writer.add_scalars('current_yaw_dot', {'raw': STrack.current_yaw_dot,
+                                                            # 'filtered': STrack.current_yaw_dot_filtered}, self.frame_id)
+                # self.writer.add_scalar(f"vel/current_yaw_dot_filtered", STrack.current_yaw_dot_filtered, self.frame_id)
+                #flush the writer
+                self.writer.flush()
                 
                 
 
@@ -366,7 +403,7 @@ class BYTETracker(object):
 
         for it in u_track:
             track = r_tracked_stracks[it]
-            track.update_dummy()
+            # track.update_dummy()
             if not track.state == TrackState.Lost:
                 track.mark_lost()
                 lost_stracks.append(track)
