@@ -24,7 +24,7 @@ class image_converter:
 
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("/camera/color/image_raw/compressed",CompressedImage,self.callback)
-        self.depth_image_sub = rospy.Subscriber("/camera/aligned_depth_to_color/image_raw",CompressedImage,self.depth_image_callback)
+        self.depth_image_sub = rospy.Subscriber("/camera/depth/image_raw/compressed",CompressedImage,self.depth_image_callback)
         self.sim_reset_sub = rospy.Subscriber("/sim_reset_tracker",String,self.sim_reset_callback)
         self.odom_sub = rospy.Subscriber("/odometry/filtered",Odometry,self.odom_callback)
 

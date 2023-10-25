@@ -1,7 +1,7 @@
 #!/usr/bin/env python3.8
 import sys
 
-sys.path.append("/home/rosen/tracking_catkin_ws/src/my_tracker")
+sys.path.append("./")
 from track import parse_opt, main
 
 if __name__ == "__main__":

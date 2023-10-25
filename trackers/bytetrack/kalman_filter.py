@@ -271,7 +271,7 @@ class KalmanFilter(object):
             this_control_mat = self.calculate_control_mat(mean[i])
             mean_rot_applied = np.dot(control_signal[i][0], this_control_mat.T)[0]
             depth_control_mat = self.calculate_depth_control_mat(mean[i], control_signal[i])
-            mean_trans_applied = 0#np.dot(control_signal[i][1], depth_control_mat.T)[0]
+            mean_trans_applied = np.dot(control_signal[i][1], depth_control_mat.T)[0]
             mean[i] = np.dot(mean[i], this_motion_mat.T) + mean_trans_applied + mean_rot_applied
             covariance[i] = np.linalg.multi_dot((
                 this_motion_mat, covariance[i], this_motion_mat.T)) + this_motion_cov
@@ -329,8 +329,8 @@ class KalmanFilter(object):
         return new_mean, new_covariance
     
     def update_dummy(self, mean, covariance, yaw_dot): #FIXME: this is a dummy update function
-        mean[4:] = 1/(5+1000*yaw_dot) * mean[4:]
-        mean[5] = 1/(10+1000*yaw_dot) * mean[5]
+        mean[4:] = 1/(5+100000*yaw_dot) * mean[4:]
+        mean[5] = 1/(10+100000*yaw_dot) * mean[5]
         mean[6] = 0
         return mean, covariance
 

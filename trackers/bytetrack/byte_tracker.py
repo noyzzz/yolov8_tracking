@@ -50,6 +50,8 @@ class STrack(BaseTrack):
         #clip the bounding box to the image size and remove the negative values
         bounding_box[bounding_box < 0] = 0
         bounding_box[np.isnan(bounding_box)] = 0
+        #if any of the bounding values is inf then set it to zero
+        # bounding_box[np.isinf(bounding_box)] = 0
         track_depth = copy.deepcopy(STrack.current_depth_image)[int(bounding_box[1]):int(bounding_box[1]+bounding_box[3]), int(bounding_box[0]):int(bounding_box[0]+bounding_box[2])]
         #get the median of the depth values in the bounding box excluding the zeros and the nans
         track_depth = track_depth[track_depth != 0]
@@ -403,7 +405,7 @@ class BYTETracker(object):
 
         for it in u_track:
             track = r_tracked_stracks[it]
-            # track.update_dummy()
+            track.update_dummy()
             if not track.state == TrackState.Lost:
                 track.mark_lost()
                 lost_stracks.append(track)
