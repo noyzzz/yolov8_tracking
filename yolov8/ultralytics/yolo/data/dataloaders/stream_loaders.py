@@ -80,7 +80,11 @@ class LoadStreams:
 
                 _, self.imgs[i] = cap.read()  # guarantee first frame
             else:
-                self.imgs[i] = s.cv_image_queue.get()
+                while s.cv_image_queue.qsize() == 0: pass
+                if s.cv_image_queue.qsize() > 0:
+                    while(s.cv_image_queue.qsize() > 0):
+                        self.imgs[i] = s.cv_image_queue.get()
+                # self.imgs[i] = s.cv_image_queue.get()
                 w = int(self.imgs[i].shape[0])
                 h = int(self.imgs[i].shape[1])
             if not is_ros:
@@ -163,6 +167,7 @@ class LoadStreams:
 
             #do the same for the depth image queue
             # self.depth_image = None
+            while self.sources[0].depth_image_queue.qsize() == 0: pass #FIXME: this is a hack to make sure the odom queue is not empty (for logging)
             if self.sources[0].depth_image_queue.qsize() > 0:
                 while(self.sources[0].depth_image_queue.qsize() > 0):
                     depth_image = self.sources[0].depth_image_queue.get()
@@ -170,7 +175,9 @@ class LoadStreams:
 
             #do the same for the odom queue
             self.odom = None
-            # while self.sources[0].odom_queue.qsize() == 0: pass #FIXME: this is a hack to make sure the odom queue is not empty (for logging)
+            #sleep until the odom queue is not empty
+            
+            while self.sources[0].odom_queue.qsize() == 0: pass #FIXME: this is a hack to make sure the odom queue is not empty (for logging)
             if self.sources[0].odom_queue.qsize() > 0:
                 while(self.sources[0].odom_queue.qsize() > 0):
                     odom = self.sources[0].odom_queue.get()

@@ -10,7 +10,7 @@
                 "--source",
                 "mot.mp4",
                 "--yolo-weights",
-                "yolov8n.pt",
+                "yolov8l.pt",
                 "--img",
                 "320",
                 "--tracking-method",

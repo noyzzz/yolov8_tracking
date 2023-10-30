@@ -335,6 +335,7 @@ def run(
                 id = output[4]
                 cls = output[5]
                 conf = output[6]
+                depth = output[7]
 
                 if save_txt:
                     # to MOT format
@@ -352,6 +353,7 @@ def run(
                     id = int(id)  # integer id
                     label = None if hide_labels else "NO DET  " + str(id) if c == -1 else (f'{id} {names[c]}' if hide_conf else \
                         (f'{id} {conf:.2f}' if hide_class else f'{id} {names[c]} {conf:.2f}'))
+                    label += f' {depth:.2f}' if depth is not None else ''
                     color = colors(c, True)
 
                     #check if bbox has any intersection with the image and give the intersection
@@ -496,6 +498,10 @@ def ros_init(is_ros_package=0):
     # cv2.destroyAllWindows()
 
 def main(opt):
+    import warnings
+
+    # Raise a warning as an exception
+    warnings.filterwarnings("error", category=RuntimeWarning)
     play_bag(int(opt.ros_bag))
     check_requirements(requirements=ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
     ic = ros_init(int(opt.ros_package))

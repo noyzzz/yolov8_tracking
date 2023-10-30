@@ -56,6 +56,8 @@ class STrack(BaseTrack):
         #get the median of the depth values in the bounding box excluding the zeros and the nans
         track_depth = track_depth[track_depth != 0]
         track_depth = track_depth[~np.isnan(track_depth)]
+        if len(track_depth) == 0:
+            return 0
         return np.median(track_depth)
     
 
@@ -222,7 +224,7 @@ class STrack(BaseTrack):
 
 class BYTETracker(object):
     def __init__(self, track_thresh=0.45, match_thresh=0.8, track_buffer=25, frame_rate=30):
-        self.last_time_stamp = time.time() #time in seconds
+        self.last_time_stamp = 0 #time in seconds
         self.tracked_stracks = []  # type: list[STrack]
         self.lost_stracks = []  # type: list[STrack]
         self.removed_stracks = []  # type: list[STrack]
@@ -256,14 +258,15 @@ class BYTETracker(object):
             bboxes.append(bbox)
         return bboxes
 
-    def update_time(self):
-        time_now = time.time()
-        self.fps = 1.0/(time_now - self.last_time_stamp)
-        print("fps is ", self.fps)
+    def update_time(self, odom):
+        current_time = odom.header.stamp.secs + odom.header.stamp.nsecs*1e-9
+        time_now = current_time
+        self.fps = 15#1.0/(time_now - self.last_time_stamp)
         self.last_time_stamp = time_now
+        print("fps: ", self.fps)
 
     def update(self, dets, color_image, depth_image = None, odom = None, masks = None):
-        self.update_time()
+        self.update_time(odom)
         STrack.update_ego_motion(odom,self.fps)
         STrack.update_depth_image(depth_image)
         #get the current time and compare it with the last time update was called
@@ -436,6 +439,11 @@ class BYTETracker(object):
             if self.frame_id - track.end_frame > self.max_time_lost:
                 track.mark_removed()
                 removed_stracks.append(track)
+        #for tracks in lost_stracks, if the x and y are not in the size of the image times 1.5 then remove the track
+        for track in self.lost_stracks:
+            if track.mean[0] < 0 or track.mean[0] > 1.5*IMG_WIDTH or track.mean[1] < 0 or track.mean[1] > 1.5*IMG_HEIGHT:
+                track.mark_removed()
+                removed_stracks.append(track)
 
         # print('Ramained match {} s'.format(t4-t3))
 
@@ -466,6 +474,7 @@ class BYTETracker(object):
             output.append(tid)
             output.append(t.cls)
             output.append(t.score)
+            output.append(t.get_d1())
             outputs.append(output)
 
         return outputs

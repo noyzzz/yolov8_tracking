@@ -87,6 +87,8 @@ class KalmanFilter(object):
         return self.control_mat
     
     def calculate_depth_control_mat(self, mean, control_signal):
+        if control_signal[2] == 0:
+            return np.zeros((2 * self.ndim, 1))
         u1 = mean[0] - self.image_width/2
         v1 = mean[1] - self.image_height/2
         bottom_y = v1 + mean[3]/2 #bottom right corner y wrt image center
@@ -329,8 +331,8 @@ class KalmanFilter(object):
         return new_mean, new_covariance
     
     def update_dummy(self, mean, covariance, yaw_dot): #FIXME: this is a dummy update function
-        mean[4:] = 1/(5+100000*yaw_dot) * mean[4:]
-        mean[5] = 1/(10+100000*yaw_dot) * mean[5]
+        mean[4:] = 0#1/(5+100000*yaw_dot) * mean[4:]
+        mean[5] = 0#1/(10+100000*yaw_dot) * mean[5]
         mean[6] = 0
         return mean, covariance
 
