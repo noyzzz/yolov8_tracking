@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug track.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/track_script.py",
+            "args": [
+                "--source",
+                "mot.mp4",
+                "--yolo-weights",
+                "yolov8l.pt",
+                "--img",
+                "320",
+                "--tracking-method",
+                "bytetrack",
+                "--show-vid",
+                "--ros-package",
+                "1",
+                "--classes",
+                "0",
+                "1",
+                "2"
+            ]
+        }
+    ]
+}
