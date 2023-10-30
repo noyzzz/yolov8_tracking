@@ -247,6 +247,7 @@ class KalmanFilter(object):
             Returns the mean vector and covariance matrix of the predicted
             state. Unobserved velocities are initialized to 0 mean.
         """
+        use_control_signal = False
         #define x_dis_to_end, y_dis_to_end, x_dis_to_start, y_dis_to_start
         x_dis_to_end = np.abs(self.image_width - mean[:, 0])
         x_dis_to_start = np.abs(mean[:, 0])
@@ -266,7 +267,7 @@ class KalmanFilter(object):
             self._q4 * np.ones_like(mean[:, 3])]
         
         sqr = np.square(np.r_[std_pos, std_vel]).T
-
+        
         for i in range(len(mean)):
             this_motion_cov = np.diag(sqr[i])
             this_motion_mat = self.calculate_motion_mat(mean[i])
@@ -274,9 +275,14 @@ class KalmanFilter(object):
             mean_rot_applied = np.dot(control_signal[i][0], this_control_mat.T)[0]
             depth_control_mat = self.calculate_depth_control_mat(mean[i], control_signal[i])
             mean_trans_applied = np.dot(control_signal[i][1], depth_control_mat.T)[0]
-            mean[i] = np.dot(mean[i], this_motion_mat.T) + mean_trans_applied + mean_rot_applied
-            covariance[i] = np.linalg.multi_dot((
-                this_motion_mat, covariance[i], this_motion_mat.T)) + this_motion_cov
+            if use_control_signal:
+                mean[i] = np.dot(mean[i], this_motion_mat.T) + mean_trans_applied + mean_rot_applied
+                covariance[i] = np.linalg.multi_dot((
+                    this_motion_mat, covariance[i], this_motion_mat.T)) + this_motion_cov
+            else:
+                mean[i] = np.dot(mean[i], this_motion_mat.T)
+                covariance[i] = np.linalg.multi_dot((
+                    this_motion_mat, covariance[i], this_motion_mat.T)) + this_motion_cov
 
         return mean, covariance
 

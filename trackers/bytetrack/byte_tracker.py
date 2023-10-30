@@ -230,12 +230,11 @@ class BYTETracker(object):
         self.removed_stracks = []  # type: list[STrack]
         self.frame_id = 0
         self.track_buffer=track_buffer
-        
         self.track_thresh = track_thresh
         self.match_thresh = match_thresh
         self.det_thresh = track_thresh + 0.1
         self.buffer_size = int(frame_rate / 30.0 * track_buffer)
-        self.max_time_lost = self.buffer_size*100
+        self.max_time_lost = self.buffer_size
         self.kalman_filter = KalmanFilter(IMG_WIDTH, IMG_HEIGHT, FOCAL_LENGTH) #TODO check the parameters
         self.use_depth = True
         self.use_odometry = True
@@ -267,7 +266,7 @@ class BYTETracker(object):
 
     def update(self, dets, color_image, depth_image = None, odom = None, masks = None):
         self.update_time(odom)
-        STrack.update_ego_motion(odom,self.fps)
+        STrack.update_ego_motion(odom, self.fps)
         STrack.update_depth_image(depth_image)
         #get the current time and compare it with the last time update was called
         time_now = time.time()
