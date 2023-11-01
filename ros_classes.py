@@ -5,11 +5,12 @@ import rospy
 import cv2
 from std_msgs.msg import String
 from sensor_msgs.msg import Image, CompressedImage
+from std_msgs.msg import Float32MultiArray
 from cv_bridge import CvBridge, CvBridgeError
 #import nav_msgs/Odometry
 from nav_msgs.msg import Odometry
 # from my_tracker.msg import ImageDetectionMessage
-
+import numpy as np
 class image_converter:
     def __init__(self, is_track_publish_activated=0):
     #initialize a queue to store cv_image from callback
@@ -43,6 +44,8 @@ class image_converter:
         try:
             cv_image = self.bridge.compressed_imgmsg_to_cv2(data, "passthrough")
             # cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+            #data is Float32MultiArray and has a layout, convert it to numpy array
+            # cv_image = np.array(data.data).reshape(data.layout.dim[0].size,data.layout.dim[1].size)
             self.depth_image_queue.put(cv_image)
         except CvBridgeError as e:
             print(e)

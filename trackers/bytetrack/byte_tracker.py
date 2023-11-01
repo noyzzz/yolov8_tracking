@@ -62,6 +62,9 @@ class STrack(BaseTrack):
     
 
     def update_depth_image(depth_image):
+        #convert depth image type to float32
+        depth_image = depth_image.astype(np.float32)
+        depth_image/=20;
         STrack.current_depth_image = depth_image
 
     def update_ego_motion(odom, fps):
@@ -234,7 +237,7 @@ class BYTETracker(object):
         self.match_thresh = match_thresh
         self.det_thresh = track_thresh + 0.1
         self.buffer_size = int(frame_rate / 30.0 * track_buffer)
-        self.max_time_lost = self.buffer_size
+        self.max_time_lost = self.buffer_size * 10.
         self.kalman_filter = KalmanFilter(IMG_WIDTH, IMG_HEIGHT, FOCAL_LENGTH) #TODO check the parameters
         self.use_depth = True
         self.use_odometry = True
@@ -260,7 +263,7 @@ class BYTETracker(object):
     def update_time(self, odom):
         current_time = odom.header.stamp.secs + odom.header.stamp.nsecs*1e-9
         time_now = current_time
-        self.fps = 15#1.0/(time_now - self.last_time_stamp)
+        self.fps = 1.0/(time_now - self.last_time_stamp)
         self.last_time_stamp = time_now
         print("fps: ", self.fps)
 
@@ -407,7 +410,7 @@ class BYTETracker(object):
 
         for it in u_track:
             track = r_tracked_stracks[it]
-            track.update_dummy()
+            # track.update_dummy()
             if not track.state == TrackState.Lost:
                 track.mark_lost()
                 lost_stracks.append(track)

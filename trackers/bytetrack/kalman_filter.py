@@ -62,12 +62,12 @@ class KalmanFilter(object):
         # the model. This is a bit hacky.
 
         
-        self._q1 = 1./10
-        self._q4 = 1./50
-        self._r1 = 1
+        self._q1 = 1./20
+        self._q4 = 1./160
+        self._r1 = 1./20
 
 
-        self._r4 = 10.0
+        self._r4 = 1./160
         params_array = Float32MultiArray()
         params_array.data = [self._q1, self._q4, self._r1, self._r4]
         
@@ -162,15 +162,15 @@ class KalmanFilter(object):
         """
         # Process noise standard deviation
         std_pos = [
-            self._q1 ,
-            self._q1 ,
+            self._q1 * mean[3],
+            self._q1 * mean[3] ,
             1e-2,
-            self._q1 ] 
+            self._q1 * mean[3]] 
         std_vel = [
-            self._q4 ,
-            self._q4 ,
+            self._q4* mean[3] ,
+            self._q4 * mean[3],
             1e-5,
-            self._q4 ]
+            self._q4 * mean[3]]
                 
         motion_cov = np.diag(np.square(np.r_[std_pos, std_vel]))
 
@@ -215,10 +215,10 @@ class KalmanFilter(object):
         #     1e-1,
         #     1]
         std = [
-            self._r1,
-            self._r1,
-            0.50,
-            self._r1]
+            self._r1 * mean[3],
+            self._r1 * mean[3],
+            1e-1,
+            self._r1 * mean[3]]
         innovation_cov = np.diag(np.square(std))
 
         # mean = H * x_hat 
@@ -256,15 +256,15 @@ class KalmanFilter(object):
 
 
         std_pos = [
-            self._q1 * np.ones_like(mean[:, 3]),
-            self._q1 * np.ones_like(mean[:, 3]) ,
-            1e-2 * np.ones_like(mean[:, 3]),
-            self._q1 * np.ones_like(mean[:, 3])]
+            self._q1 * (mean[:, 3]),
+            self._q1 * (mean[:, 3]) ,
+            1e-2 * (mean[:, 3]),
+            self._q1 * (mean[:, 3])]
         std_vel = [
-            self._q4 * np.ones_like(mean[:, 3]) ,
-            self._q4 * np.ones_like(mean[:, 3]) ,
-            1e-5 * np.ones_like(mean[:, 3]),
-            self._q4 * np.ones_like(mean[:, 3])]
+            self._q4 * (mean[:, 3]) ,
+            self._q4 * (mean[:, 3]) ,
+            1e-5 * (mean[:, 3]),
+            self._q4 * (mean[:, 3])]
         
         sqr = np.square(np.r_[std_pos, std_vel]).T
         
@@ -337,8 +337,8 @@ class KalmanFilter(object):
         return new_mean, new_covariance
     
     def update_dummy(self, mean, covariance, yaw_dot): #FIXME: this is a dummy update function
-        mean[4:] = 0#1/(5+100000*yaw_dot) * mean[4:]
-        mean[5] = 0#1/(10+100000*yaw_dot) * mean[5]
+        mean[4:] = 1/(5+100000*yaw_dot) * mean[4:]
+        mean[5] = 1/(10+100000*yaw_dot) * mean[5]
         mean[6] = 0
         return mean, covariance
 
