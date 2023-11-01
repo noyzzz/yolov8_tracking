@@ -465,7 +465,7 @@ class BYTETracker(object):
         for track in local_lost_stracks:
             track.cls = -1
         test_all_stracks = joint_stracks(self.tracked_stracks, local_lost_stracks)
-        for t in test_all_stracks:
+        for t in output_stracks:
             output= []
             tlwh = t.tlwh
             tid = t.track_id
