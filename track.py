@@ -58,6 +58,14 @@ from yolov8.ultralytics.yolo.utils.plotting import Annotator, colors, save_one_b
 from trackers.multi_tracker_zoo import create_tracker
 from ros_classes import image_converter
 
+def add_noise2tensor(tensor, noise_std):
+    """
+    tensor: [N, 6]
+    """
+    noise = torch.randn_like(tensor) * noise_std
+    tensor[:, :4] += noise[:, :4]
+    return tensor
+
 def play_bag(is_ros_bag):
     if is_ros_bag:
         player_state = subprocess.Popen(["rosbag", "play", "-l", "/home/rosen/tracking_catkin_ws/src/my_tracker/bags/carla_stationary_obj_slow.bag"])
@@ -112,6 +120,7 @@ def run(
         ros_package = 0,
         ros_bag = 1,
 ):
+    OP_MODE = "EVAL"
     is_ros = isinstance(source, image_converter)
     #copy source to avoid changing the original
     source_copy = copy.copy(source)
@@ -238,6 +247,8 @@ def run(
                     s += f'{i}: '
                     txt_file_name = p.name
                     save_path = str(save_dir / p.name)  # im.jpg, vid.mp4, ...
+                else:
+                    txt_file_name = "tracks_preds"
             else:
                 p, im0, _ = path, im0s.copy(), getattr(dataset, 'frame', 0)
                 p = Path(p)  # to Path
@@ -250,8 +261,8 @@ def run(
                     txt_file_name = p.parent.name  # get folder name containing current img
                     save_path = str(save_dir / p.parent.name)  # im.jpg, vid.mp4, ...
             curr_frames[i] = im0
-            if not is_ros:
-                txt_path = str(save_dir / 'tracks' / txt_file_name)  # im.txt
+            # if not is_ros:
+            txt_path = str(save_dir / 'tracks' / txt_file_name)  # im.txt
             s += '%gx%g ' % im.shape[2:]  # print string
             imc = im0.copy() if save_crop else im0  # for save_crop
 
@@ -295,23 +306,52 @@ def run(
                 depth_image = extra_output["depth_image"]
                 if extra_output["odom"] is not None:
                     odom = extra_output["odom"]
+                modified_gt_list = None 
+                if extra_output["gt"] is not None:  
+                    modified_gt_list = []
+                    gt_list = extra_output["gt"]
+                    for gt in gt_list:
+                        gt_vals = list(gt.values())
+                        this_xyxy = gt_vals[1:5]
+                        #if xyxy is out of the image or if any of them is nan or negative, skip it
+                        if this_xyxy[0] < 0 or this_xyxy[1] < 0 or this_xyxy[2] > im0.shape[1] or this_xyxy[3] > im0.shape[0] or np.isnan(this_xyxy).any():
+                            continue
+                        this_conf = 1.0
+                        this_cls = 0
+                        this_msg = [this_xyxy[0], this_xyxy[1], this_xyxy[2], this_xyxy[3], this_conf, this_cls]
+                        this_det = torch.tensor([this_msg])
+                        modified_gt_list.append(this_det)
+                        #convert modified_gt_list to torch tensor
+                        #generate a random number with probability 0.7
+                        output_random = np.random.rand()
+                    if len(modified_gt_list) > 0 and output_random < 0.7:
+                        modified_gt_list = torch.cat(modified_gt_list, dim=0)
+                        # modified_gt_list = add_noise2tensor(modified_gt_list, 3) 
+                    else:
+                        modified_gt_list = torch.empty((0,6))
                 outputs[i] = None
                 track_pred_tlwhs = None
-                if tracker_list[i].use_depth and tracker_list[i].use_odometry:
-                    outputs[i] = tracker_list[i].update(det.cpu(), im0, depth_image, odom, None)
+                if hasattr(tracker_list[i], "use_depth") and hasattr(tracker_list[i], "use_odometry") and tracker_list[i].use_depth and tracker_list[i].use_odometry:
+                    if OP_MODE == "YOLO":
+                        outputs[i] = tracker_list[i].update(det.cpu(), im0, depth_image, odom, None)
+                    elif OP_MODE == "EVAL":
+                        outputs[i] = tracker_list[i].update(modified_gt_list, im0, depth_image, odom, None)
                 else:
-                    outputs[i] = tracker_list[i].update(det.cpu(), im0)
-                track_pred_tlwhs = tracker_list[i].get_all_track_predictions()
+                    if OP_MODE == "YOLO":
+                        outputs[i] = tracker_list[i].update(det.cpu(), im0)
+                    elif OP_MODE == "EVAL":
+                        outputs[i] = tracker_list[i].update(modified_gt_list, im0)
+            #     track_pred_tlwhs = tracker_list[i].get_all_track_predictions()
 
-                    #what is each det element? [x1, y1, x2, y2, conf, cls, cls_conf]
-                    # outputs[i] =  tracker_list[i].update(det.cpu(), im0)
+            #         #what is each det element? [x1, y1, x2, y2, conf, cls, cls_conf]
+            #         # outputs[i] =  tracker_list[i].update(det.cpu(), im0)
 
-            for track_pred in track_pred_tlwhs:
-                xyxy = ops.xywh2xyxy(track_pred[0:4])
-                track_id = track_pred[4]
-                #if xyxy is out of the image or if any of them is nan, do not draw it 
-                if xyxy[0] < 0 or xyxy[1] < 0 or xyxy[2] > im0.shape[1] or xyxy[3] > im0.shape[0] or np.isnan(xyxy).any():
-                    continue
+            # for track_pred in track_pred_tlwhs:
+            #     xyxy = ops.xywh2xyxy(track_pred[0:4])
+            #     track_id = track_pred[4]
+            #     #if xyxy is out of the image or if any of them is nan, do not draw it 
+            #     if xyxy[0] < 0 or xyxy[1] < 0 or xyxy[2] > im0.shape[1] or xyxy[3] > im0.shape[0] or np.isnan(xyxy).any():
+            #         continue
                 # annotator.box_label(xyxy, str(track_id), color=(255, 0, 0))
 
             if det is not None and len(det):  
@@ -335,7 +375,15 @@ def run(
                 id = output[4]
                 cls = output[5]
                 conf = output[6]
-                depth = output[7]
+                if len(output) > 7:
+                    depth = output[7]
+                    try:
+                        depth = float(depth)
+                    except:
+                        depth = -1
+
+                else:
+                    depth = -1
 
                 if save_txt:
                     # to MOT format
@@ -366,7 +414,7 @@ def run(
                     bbox[2] = np.clip(bbox[2], 0, im0.shape[1])
                     bbox[3] = np.clip(bbox[3], 0, im0.shape[0])
                     #if nan, do not draw it
-                    if not np.isnan(bbox).any() and intersection > 0:
+                    if not np.isnan(np.array(bbox)).any() and intersection > 0:
                         annotator.box_label(bbox, label, color=color)
                     
                     if save_trajectories and tracking_method == 'strongsort':

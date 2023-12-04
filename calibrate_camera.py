@@ -92,7 +92,7 @@ class GetZOrientation:
         # cv2.namedWindow("image1")
         # cv2.setMouseCallback("image", self.get_location_to_track)
         self.odom_sub = rospy.Subscriber(
-            "/odometry/filtered", Odometry, self.callback, queue_size=1)
+            "/odometry_slam", Odometry, self.callback, queue_size=1)
         if self.is_sim:
             self.camera_sub = rospy.Subscriber(
                 "/camera/color/image_raw/compressed", CompressedImage, self.image_callback, queue_size=1)
@@ -147,7 +147,8 @@ class GetZOrientation:
         cv_image = np.array(cv_image, dtype=np.float32)
         # change all of the zero values to nan
         cv_image[np.where(cv_image == 0)] = np.nan
-        self.depth_image = cv_image
+        # divide by 10 because the published depth has been multiplied by 10
+        self.depth_image = cv_image/10.0
 
 
     def estimate_rot_u2(self, alpha, u1, f):
@@ -266,9 +267,11 @@ class GetZOrientation:
 
         diff_x_odom = self.current_position[0]-self.initial_position[0]
         diff_y_odom = self.current_position[1]-self.initial_position[1]
+
         delta_yaw = self.current_yaw-self.initial_yaw
-        delta_x_car_frame = diff_x_odom*math.cos(self.current_yaw)+diff_y_odom*math.sin(self.current_yaw)
-        delta_y_car_frame = -diff_x_odom*math.sin(self.current_yaw)+diff_y_odom*math.cos(self.current_yaw)
+        # delta_x_car_frame = diff_x_odom*math.cos(self.current_yaw)+diff_y_odom*math.sin(self.current_yaw)
+        # delta_y_car_frame = -diff_x_odom*math.sin(self.current_yaw)+diff_y_odom*math.cos(self.current_yaw)
+        delta_x_car_frame = np.sqrt(diff_x_odom**2+diff_y_odom**2)
         #print the three values with 3 decimal points of precision, format the string with f-strings
         # print(f"delta_x: {delta_x_car_frame:.3f} delta_y: {delta_y_car_frame:.3f} delta_yaw: {delta_yaw:.3f}")
         

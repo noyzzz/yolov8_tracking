@@ -10,12 +10,13 @@
                 "--source",
                 "mot.mp4",
                 "--yolo-weights",
-                "yolov8l.pt",
+                "yolov8x.pt",
                 "--img",
                 "320",
                 "--tracking-method",
                 "bytetrack",
                 "--show-vid",
+                "--save-txt",
                 "--ros-package",
                 "1",
                 "--ros-bag",
@@ -23,7 +24,10 @@
                 "--classes",
                 "0",
                 "1",
-                "2"
+                "2",
+                "3",
+                "5",
+                "7"
             ]
         }
     ]

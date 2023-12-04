@@ -64,10 +64,10 @@ class KalmanFilter(object):
         
         self._q1 = 1./20
         self._q4 = 1./160
-        self._r1 = 1./20
+        self._r1 = 1/10.
 
 
-        self._r4 = 1./160
+        self._r4 = 1./160 #to initiate P matrix ONLY
         params_array = Float32MultiArray()
         params_array.data = [self._q1, self._q4, self._r1, self._r4]
         
@@ -247,7 +247,7 @@ class KalmanFilter(object):
             Returns the mean vector and covariance matrix of the predicted
             state. Unobserved velocities are initialized to 0 mean.
         """
-        use_control_signal = False
+        use_control_signal = True
         #define x_dis_to_end, y_dis_to_end, x_dis_to_start, y_dis_to_start
         x_dis_to_end = np.abs(self.image_width - mean[:, 0])
         x_dis_to_start = np.abs(mean[:, 0])
@@ -276,7 +276,7 @@ class KalmanFilter(object):
             depth_control_mat = self.calculate_depth_control_mat(mean[i], control_signal[i])
             mean_trans_applied = np.dot(control_signal[i][1], depth_control_mat.T)[0]
             if use_control_signal:
-                mean[i] = np.dot(mean[i], this_motion_mat.T) + mean_trans_applied + mean_rot_applied
+                mean[i] = np.dot(mean[i], this_motion_mat.T) + mean_rot_applied + mean_trans_applied
                 covariance[i] = np.linalg.multi_dot((
                     this_motion_mat, covariance[i], this_motion_mat.T)) + this_motion_cov
             else:

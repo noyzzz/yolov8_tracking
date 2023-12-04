@@ -80,11 +80,11 @@ class LoadStreams:
 
                 _, self.imgs[i] = cap.read()  # guarantee first frame
             else:
-                while s.cv_image_queue.qsize() == 0: pass
-                if s.cv_image_queue.qsize() > 0:
-                    while(s.cv_image_queue.qsize() > 0):
-                        self.imgs[i] = s.cv_image_queue.get()
-                # self.imgs[i] = s.cv_image_queue.get()
+                # while s.cv_image_queue.qsize() == 0: pass
+                # if s.cv_image_queue.qsize() > 0:
+                #     while(s.cv_image_queue.qsize() > 0):
+                #         self.imgs[i] = s.cv_image_queue.get()
+                self.imgs[i] = s.cv_image_queue.get()
                 w = int(self.imgs[i].shape[0])
                 h = int(self.imgs[i].shape[1])
             if not is_ros:
@@ -182,9 +182,14 @@ class LoadStreams:
                 while(self.sources[0].odom_queue.qsize() > 0):
                     odom = self.sources[0].odom_queue.get()
                 self.odom = odom
+            self.gt = []
+            if self.sources[0].gt_queue.qsize() > 0:
+                while(self.sources[0].gt_queue.qsize() > 0):
+                    gt = self.sources[0].gt_queue.get()
+                self.gt = gt
             
             #make a dictionary that has the reset signal and the depth image
-            self.extra_output = {"reset_signal": self.reset_signal, "depth_image": self.depth_image, "odom": self.odom}
+            self.extra_output = {"reset_signal": self.reset_signal, "depth_image": self.depth_image, "odom": self.odom, "gt": self.gt}
 
             return self.sources, im, im0, None,'', self.extra_output
         else:
