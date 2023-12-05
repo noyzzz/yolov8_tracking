@@ -17,6 +17,7 @@
                 "bytetrack",
                 "--show-vid",
                 "--save-txt",
+                "--save-crop",
                 "--ros-package",
                 "1",
                 "--ros-bag",

@@ -309,6 +309,7 @@ def run(
                 modified_gt_list = None 
                 if extra_output["gt"] is not None:  
                     modified_gt_list = []
+                    modified_annotation_gt_list = [] # for the generation of the ground truth
                     gt_list = extra_output["gt"]
                     for gt in gt_list:
                         gt_vals = list(gt.values())
@@ -319,12 +320,14 @@ def run(
                         this_conf = 1.0
                         this_cls = 0
                         this_msg = [this_xyxy[0], this_xyxy[1], this_xyxy[2], this_xyxy[3], this_conf, this_cls]
+                        this_annotated_msg = [gt_vals[0], this_xyxy[0], this_xyxy[1], this_xyxy[2], this_xyxy[3], this_conf, this_cls]
                         this_det = torch.tensor([this_msg])
                         modified_gt_list.append(this_det)
+                        modified_annotation_gt_list.append(this_annotated_msg)
                         #convert modified_gt_list to torch tensor
                         #generate a random number with probability 0.7
                         output_random = np.random.rand()
-                    if len(modified_gt_list) > 0 and output_random < 0.7:
+                    if len(modified_gt_list) > 0:# and output_random < 0.7:
                         modified_gt_list = torch.cat(modified_gt_list, dim=0)
                         # modified_gt_list = add_noise2tensor(modified_gt_list, 3) 
                     else:
@@ -368,6 +371,20 @@ def run(
                         )
                     
             
+            save_gt = True
+            gt_path = str(save_dir / "gt")  # im.txt
+            if save_gt and len(modified_gt_list) > 0:
+                for gt in modified_annotation_gt_list:
+                    this_frame_idx = frame_idx
+                    this_id = gt[0]
+                    this_x = gt[1]
+                    this_y = gt[2]
+                    this_w = gt[3] - gt[1]
+                    this_h = gt[4] - gt[2]
+                    this_msg = [this_frame_idx+1, this_id, this_x, this_y, this_w, this_h, 1, 1, 1]
+                    with open(gt_path + '.txt', 'a') as f:
+                        f.write(('%g ' * 9 + '\n') % tuple(this_msg))
+
 
             for j, (output) in enumerate(outputs[i]):
                 
@@ -384,6 +401,7 @@ def run(
 
                 else:
                     depth = -1
+
 
                 if save_txt:
                     # to MOT format
@@ -422,11 +440,18 @@ def run(
                         tracker_list[i].trajectory(im0, q, color=color)
                     if save_crop:
                         txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
-                        save_one_box(np.array(bbox, dtype=np.int16), imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
+                        save_one_box(np.array(bbox, dtype=np.int16), imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{j}.jpg', BGR=True)
                             
                 
             # Stream results
             im0 = annotator.result()
+            #save im0 as jpg with name: frame_idx.jpg in subfolder of frames in save_dir
+            #create  subfolder of frames in save_dir
+
+
+            save_path = str(save_dir / txt_file_name / f'{frame_idx}.jpg')
+            cv2.imwrite(save_path, im0)
+
             if ros_package == "1": #it means that the image_detection message type is being generated and published
                 from my_tracker.msg import ImageDetectionMessage
                 im0_flatten = im0.flatten().tolist()

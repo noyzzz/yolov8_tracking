@@ -135,7 +135,7 @@ class KalmanFilter(object):
             self._r4  * measurement[3]
             ]
         
-        covariance = np.diag(np.square(std))
+        covariance = np.diag(np.square(std))*1000
         return mean, covariance
 
     def predict(self, mean, covariance, input_signal):
