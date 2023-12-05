@@ -80,6 +80,10 @@ class LoadStreams:
 
                 _, self.imgs[i] = cap.read()  # guarantee first frame
             else:
+                # while s.cv_image_queue.qsize() == 0: pass
+                # if s.cv_image_queue.qsize() > 0:
+                #     while(s.cv_image_queue.qsize() > 0):
+                #         self.imgs[i] = s.cv_image_queue.get()
                 self.imgs[i] = s.cv_image_queue.get()
                 w = int(self.imgs[i].shape[0])
                 h = int(self.imgs[i].shape[1])
@@ -141,7 +145,6 @@ class LoadStreams:
         if not all(x.is_alive() for x in self.threads) or cv2.waitKey(1) == ord('q'):  # q to quit
             cv2.destroyAllWindows()
             raise StopIteration
-
         im0 = self.imgs.copy()
 
 
@@ -161,8 +164,10 @@ class LoadStreams:
                     reset_signal = self.sources[0].sim_reset_queue.get()
                 self.reset_signal = reset_signal
 
+
             #do the same for the depth image queue
             # self.depth_image = None
+            while self.sources[0].depth_image_queue.qsize() == 0: pass #FIXME: this is a hack to make sure the odom queue is not empty (for logging)
             if self.sources[0].depth_image_queue.qsize() > 0:
                 while(self.sources[0].depth_image_queue.qsize() > 0):
                     depth_image = self.sources[0].depth_image_queue.get()
@@ -170,13 +175,21 @@ class LoadStreams:
 
             #do the same for the odom queue
             self.odom = None
+            #sleep until the odom queue is not empty
+            
+            while self.sources[0].odom_queue.qsize() == 0: pass #FIXME: this is a hack to make sure the odom queue is not empty (for logging)
             if self.sources[0].odom_queue.qsize() > 0:
                 while(self.sources[0].odom_queue.qsize() > 0):
                     odom = self.sources[0].odom_queue.get()
                 self.odom = odom
+            self.gt = []
+            if self.sources[0].gt_queue.qsize() > 0:
+                while(self.sources[0].gt_queue.qsize() > 0):
+                    gt = self.sources[0].gt_queue.get()
+                self.gt = gt
             
             #make a dictionary that has the reset signal and the depth image
-            self.extra_output = {"reset_signal": self.reset_signal, "depth_image": self.depth_image, "odom": self.odom}
+            self.extra_output = {"reset_signal": self.reset_signal, "depth_image": self.depth_image, "odom": self.odom, "gt": self.gt}
 
             return self.sources, im, im0, None,'', self.extra_output
         else:

@@ -203,13 +203,13 @@ def run(
         with dt[2]:
             if is_seg:
                 masks = []
-                p = non_max_suppression(preds[0], conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det, nm=32)
+                nms_dets_list = non_max_suppression(preds[0], conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det, nm=32)
                 proto = preds[1][-1]
             else:
-                p = non_max_suppression(preds, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+                nms_dets_list = non_max_suppression(preds, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
             
         # Process detections
-        for i, det in enumerate(p):  # detections per image
+        for i, det in enumerate(nms_dets_list):  # detections per image
             seen += 1
             if webcam:  # bs >= 1
                 p, im0, _ = path[i], im0s[i].copy(), dataset.count
@@ -218,6 +218,8 @@ def run(
                     s += f'{i}: '
                     txt_file_name = p.name
                     save_path = str(save_dir / p.name)  # im.jpg, vid.mp4, ...
+                else:
+                    txt_file_name = "tracks_preds"
             else:
                 p, im0, _ = path, im0s.copy(), getattr(dataset, 'frame', 0)
                 p = Path(p)  # to Path
@@ -230,8 +232,8 @@ def run(
                     txt_file_name = p.parent.name  # get folder name containing current img
                     save_path = str(save_dir / p.parent.name)  # im.jpg, vid.mp4, ...
             curr_frames[i] = im0
-            if not is_ros:
-                txt_path = str(save_dir / 'tracks' / txt_file_name)  # im.txt
+            # if not is_ros:
+            txt_path = str(save_dir / 'tracks' / txt_file_name)  # im.txt
             s += '%gx%g ' % im.shape[2:]  # print string
             imc = im0.copy() if save_crop else im0  # for save_crop
 
@@ -311,7 +313,7 @@ def run(
                             # Write MOT compliant results to file
                             with open(txt_path + '.txt', 'a') as f:
                                 f.write(('%g ' * 10 + '\n') % (frame_idx + 1, id, bbox_left,  # MOT format
-                                                               bbox_top, bbox_w, bbox_h, -1, -1, -1, i))
+                                                               bbox_top, bbox_w, bbox_h, 0, -1, -1,-1))
 
                         if save_vid or save_crop or show_vid:  # Add bbox/seg to image
                             c = int(cls)  # integer class
