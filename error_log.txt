@@ -1,0 +1,507 @@
+MotChallenge2DBox
+mot
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 48, in mapstar
+    return list(map(*args))
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 64, in wrap
+    return f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 190, in eval_sequence
+    raw_data = dataset.get_raw_seq_data(tracker, seq)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 64, in wrap
+    return f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/_base_dataset.py", line 92, in get_raw_seq_data
+    raw_gt_data = self._load_raw_file(tracker, seq, is_gt=True)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/mot_challenge_2d_box.py", line 228, in _load_raw_file
+    time_data = np.asarray(read_data[time_key], dtype=np.float)
+  File "/home/rosen/.local/lib/python3.8/site-packages/numpy/__init__.py", line 305, in __getattr__
+    raise AttributeError(__former_attrs__[attr])
+AttributeError: module 'numpy' has no attribute 'float'.
+`np.float` was a deprecated alias for the builtin `float`. To avoid this error in existing code, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 81, in evaluate
+    results = pool.map(_eval_sequence, seq_list)
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 364, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 768, in get
+    raise self._value
+AttributeError: module 'numpy' has no attribute 'float'.
+`np.float` was a deprecated alias for the builtin `float`. To avoid this error in existing code, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+
+
+
+
+
+MotChallenge2DBox
+mot
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 48, in mapstar
+    return list(map(*args))
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 64, in wrap
+    return f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 190, in eval_sequence
+    raw_data = dataset.get_raw_seq_data(tracker, seq)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 64, in wrap
+    return f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/_base_dataset.py", line 92, in get_raw_seq_data
+    raw_gt_data = self._load_raw_file(tracker, seq, is_gt=True)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/mot_challenge_2d_box.py", line 228, in _load_raw_file
+    time_data = np.asarray(read_data[time_key], dtype=np.float)
+  File "/home/rosen/.local/lib/python3.8/site-packages/numpy/__init__.py", line 305, in __getattr__
+    raise AttributeError(__former_attrs__[attr])
+AttributeError: module 'numpy' has no attribute 'float'.
+`np.float` was a deprecated alias for the builtin `float`. To avoid this error in existing code, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 81, in evaluate
+    results = pool.map(_eval_sequence, seq_list)
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 364, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 768, in get
+    raise self._value
+AttributeError: module 'numpy' has no attribute 'float'.
+`np.float` was a deprecated alias for the builtin `float`. To avoid this error in existing code, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+
+
+
+
+
+MotChallenge2DBox
+mot
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 48, in mapstar
+    return list(map(*args))
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 64, in wrap
+    return f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 190, in eval_sequence
+    raw_data = dataset.get_raw_seq_data(tracker, seq)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 64, in wrap
+    return f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/_base_dataset.py", line 92, in get_raw_seq_data
+    raw_gt_data = self._load_raw_file(tracker, seq, is_gt=True)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/mot_challenge_2d_box.py", line 228, in _load_raw_file
+    time_data = np.asarray(read_data[time_key], dtype=np.float)
+  File "/home/rosen/.local/lib/python3.8/site-packages/numpy/__init__.py", line 305, in __getattr__
+    raise AttributeError(__former_attrs__[attr])
+AttributeError: module 'numpy' has no attribute 'float'.
+`np.float` was a deprecated alias for the builtin `float`. To avoid this error in existing code, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 81, in evaluate
+    results = pool.map(_eval_sequence, seq_list)
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 364, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 768, in get
+    raise self._value
+AttributeError: module 'numpy' has no attribute 'float'.
+`np.float` was a deprecated alias for the builtin `float`. To avoid this error in existing code, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+
+
+
+
+
+MotChallenge2DBox
+mot
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 48, in mapstar
+    return list(map(*args))
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 64, in wrap
+    return f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 190, in eval_sequence
+    raw_data = dataset.get_raw_seq_data(tracker, seq)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 64, in wrap
+    return f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/_base_dataset.py", line 92, in get_raw_seq_data
+    raw_gt_data = self._load_raw_file(tracker, seq, is_gt=True)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/mot_challenge_2d_box.py", line 228, in _load_raw_file
+    time_data = np.asarray(read_data[time_key], dtype=np.float)
+  File "/home/rosen/.local/lib/python3.8/site-packages/numpy/__init__.py", line 305, in __getattr__
+    raise AttributeError(__former_attrs__[attr])
+AttributeError: module 'numpy' has no attribute 'float'.
+`np.float` was a deprecated alias for the builtin `float`. To avoid this error in existing code, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 81, in evaluate
+    results = pool.map(_eval_sequence, seq_list)
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 364, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 768, in get
+    raise self._value
+AttributeError: module 'numpy' has no attribute 'float'.
+`np.float` was a deprecated alias for the builtin `float`. To avoid this error in existing code, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+
+
+
+
+
+MotChallenge2DBox
+mot
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 48, in mapstar
+    return list(map(*args))
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 64, in wrap
+    return f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 190, in eval_sequence
+    raw_data = dataset.get_raw_seq_data(tracker, seq)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 64, in wrap
+    return f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/_base_dataset.py", line 92, in get_raw_seq_data
+    raw_gt_data = self._load_raw_file(tracker, seq, is_gt=True)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/mot_challenge_2d_box.py", line 228, in _load_raw_file
+    time_data = np.asarray(read_data[time_key], dtype=np.float)
+  File "/home/rosen/.local/lib/python3.8/site-packages/numpy/__init__.py", line 305, in __getattr__
+    raise AttributeError(__former_attrs__[attr])
+AttributeError: module 'numpy' has no attribute 'float'.
+`np.float` was a deprecated alias for the builtin `float`. To avoid this error in existing code, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 81, in evaluate
+    results = pool.map(_eval_sequence, seq_list)
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 364, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 768, in get
+    raise self._value
+AttributeError: module 'numpy' has no attribute 'float'.
+`np.float` was a deprecated alias for the builtin `float`. To avoid this error in existing code, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+
+
+
+
+
+MotChallenge2DBox
+mot
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 48, in mapstar
+    return list(map(*args))
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 64, in wrap
+    return f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 190, in eval_sequence
+    raw_data = dataset.get_raw_seq_data(tracker, seq)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 64, in wrap
+    return f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/_base_dataset.py", line 92, in get_raw_seq_data
+    raw_gt_data = self._load_raw_file(tracker, seq, is_gt=True)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/mot_challenge_2d_box.py", line 228, in _load_raw_file
+    time_data = np.asarray(read_data[time_key], dtype=np.float)
+  File "/home/rosen/.local/lib/python3.8/site-packages/numpy/__init__.py", line 305, in __getattr__
+    raise AttributeError(__former_attrs__[attr])
+AttributeError: module 'numpy' has no attribute 'float'.
+`np.float` was a deprecated alias for the builtin `float`. To avoid this error in existing code, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 81, in evaluate
+    results = pool.map(_eval_sequence, seq_list)
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 364, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 768, in get
+    raise self._value
+AttributeError: module 'numpy' has no attribute 'float'.
+`np.float` was a deprecated alias for the builtin `float`. To avoid this error in existing code, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+
+
+
+
+
+MotChallenge2DBox
+mot
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 48, in mapstar
+    return list(map(*args))
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 64, in wrap
+    return f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 190, in eval_sequence
+    raw_data = dataset.get_raw_seq_data(tracker, seq)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 64, in wrap
+    return f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/_base_dataset.py", line 92, in get_raw_seq_data
+    raw_gt_data = self._load_raw_file(tracker, seq, is_gt=True)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/mot_challenge_2d_box.py", line 228, in _load_raw_file
+    time_data = np.asarray(read_data[time_key], dtype=float)
+  File "/home/rosen/.local/lib/python3.8/site-packages/numpy/__init__.py", line 305, in __getattr__
+    raise AttributeError(__former_attrs__[attr])
+AttributeError: module 'numpy' has no attribute 'float'.
+`np.float` was a deprecated alias for the builtin `float`. To avoid this error in existing code, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 81, in evaluate
+    results = pool.map(_eval_sequence, seq_list)
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 364, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 768, in get
+    raise self._value
+AttributeError: module 'numpy' has no attribute 'float'.
+`np.float` was a deprecated alias for the builtin `float`. To avoid this error in existing code, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+
+
+
+
+
+MotChallenge2DBox
+mot
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/_base_dataset.py", line 152, in _load_simple_text_file
+    fp = open(file)
+FileNotFoundError: [Errno 2] No such file or directory: 'runs/mot_eval/exp22/mot/exp22.txt'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 48, in mapstar
+    return list(map(*args))
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 64, in wrap
+    return f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 190, in eval_sequence
+    raw_data = dataset.get_raw_seq_data(tracker, seq)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 64, in wrap
+    return f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/_base_dataset.py", line 93, in get_raw_seq_data
+    raw_tracker_data = self._load_raw_file(tracker, seq, is_gt=False)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/mot_challenge_2d_box.py", line 201, in _load_raw_file
+    read_data, ignore_data = self._load_simple_text_file(file, is_zipped=self.data_is_zipped, zip_file=zip_file)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/_base_dataset.py", line 209, in _load_simple_text_file
+    raise TrackEvalException(
+trackeval.utils.TrackEvalException: File exp22.txt cannot be read because it is either not present or invalidly formatted
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 81, in evaluate
+    results = pool.map(_eval_sequence, seq_list)
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 364, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 768, in get
+    raise self._value
+trackeval.utils.TrackEvalException: File exp22.txt cannot be read because it is either not present or invalidly formatted
+
+
+
+
+
+MotChallenge2DBox
+mot
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/_base_dataset.py", line 152, in _load_simple_text_file
+    fp = open(file)
+FileNotFoundError: [Errno 2] No such file or directory: 'runs/mot_eval/exp/mot/exp.txt'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 48, in mapstar
+    return list(map(*args))
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 64, in wrap
+    return f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 190, in eval_sequence
+    raw_data = dataset.get_raw_seq_data(tracker, seq)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 64, in wrap
+    return f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/_base_dataset.py", line 93, in get_raw_seq_data
+    raw_tracker_data = self._load_raw_file(tracker, seq, is_gt=False)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/mot_challenge_2d_box.py", line 201, in _load_raw_file
+    read_data, ignore_data = self._load_simple_text_file(file, is_zipped=self.data_is_zipped, zip_file=zip_file)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/_base_dataset.py", line 209, in _load_simple_text_file
+    raise TrackEvalException(
+trackeval.utils.TrackEvalException: File exp.txt cannot be read because it is either not present or invalidly formatted
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 81, in evaluate
+    results = pool.map(_eval_sequence, seq_list)
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 364, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 768, in get
+    raise self._value
+trackeval.utils.TrackEvalException: File exp.txt cannot be read because it is either not present or invalidly formatted
+
+
+
+
+
+MotChallenge2DBox
+mot
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/_base_dataset.py", line 152, in _load_simple_text_file
+    fp = open(file)
+FileNotFoundError: [Errno 2] No such file or directory: 'runs/mot_eval/exp2/mot/exp2.txt'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 48, in mapstar
+    return list(map(*args))
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 64, in wrap
+    return f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 190, in eval_sequence
+    raw_data = dataset.get_raw_seq_data(tracker, seq)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 64, in wrap
+    return f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/_base_dataset.py", line 93, in get_raw_seq_data
+    raw_tracker_data = self._load_raw_file(tracker, seq, is_gt=False)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/mot_challenge_2d_box.py", line 201, in _load_raw_file
+    read_data, ignore_data = self._load_simple_text_file(file, is_zipped=self.data_is_zipped, zip_file=zip_file)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/_base_dataset.py", line 209, in _load_simple_text_file
+    raise TrackEvalException(
+trackeval.utils.TrackEvalException: File exp2.txt cannot be read because it is either not present or invalidly formatted
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 81, in evaluate
+    results = pool.map(_eval_sequence, seq_list)
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 364, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+  File "/usr/lib/python3.8/multiprocessing/pool.py", line 768, in get
+    raise self._value
+trackeval.utils.TrackEvalException: File exp2.txt cannot be read because it is either not present or invalidly formatted
+
+
+
+
+
+MotChallenge2DBox
+mot
+Traceback (most recent call last):
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/_base_dataset.py", line 152, in _load_simple_text_file
+    fp = open(file)
+FileNotFoundError: [Errno 2] No such file or directory: 'runs/mot_eval/exp3/mot/exp3.txt'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 86, in evaluate
+    res[curr_seq] = eval_sequence(curr_seq, dataset, tracker, class_list, metrics_list,
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 17, in wrap
+    result = f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 190, in eval_sequence
+    raw_data = dataset.get_raw_seq_data(tracker, seq)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 17, in wrap
+    result = f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/_base_dataset.py", line 93, in get_raw_seq_data
+    raw_tracker_data = self._load_raw_file(tracker, seq, is_gt=False)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/mot_challenge_2d_box.py", line 201, in _load_raw_file
+    read_data, ignore_data = self._load_simple_text_file(file, is_zipped=self.data_is_zipped, zip_file=zip_file)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/_base_dataset.py", line 209, in _load_simple_text_file
+    raise TrackEvalException(
+trackeval.utils.TrackEvalException: File exp3.txt cannot be read because it is either not present or invalidly formatted
+
+
+
+
+
+MotChallenge2DBox
+mot
+Traceback (most recent call last):
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 86, in evaluate
+    res[curr_seq] = eval_sequence(curr_seq, dataset, tracker, class_list, metrics_list,
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 17, in wrap
+    result = f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/eval.py", line 195, in eval_sequence
+    data = dataset.get_preprocessed_seq_data(raw_data, cls)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/_timing.py", line 17, in wrap
+    result = f(*args, **kw)
+  File "/home/rosen/tracking_catkin_ws/src/my_tracker/trackeval/datasets/mot_challenge_2d_box.py", line 359, in get_preprocessed_seq_data
+    to_remove_tracker = np.array([], np.int)
+  File "/home/rosen/.local/lib/python3.8/site-packages/numpy/__init__.py", line 305, in __getattr__
+    raise AttributeError(__former_attrs__[attr])
+AttributeError: module 'numpy' has no attribute 'int'.
+`np.int` was a deprecated alias for the builtin `int`. To avoid this error in existing code, use `int` by itself. Doing this will not modify any behavior and is safe. When replacing `np.int`, you may wish to use e.g. `np.int64` or `np.int32` to specify the precision. If you wish to review your current use, check the release note link for additional information.
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+
+
+
+
+

@@ -282,7 +282,7 @@ class BYTETracker(object):
     def update_time(self, odom):
         current_time = odom.header.stamp.secs + odom.header.stamp.nsecs*1e-9
         time_now = current_time
-        self.fps =  (1.0/(time_now - self.last_time_stamp))*2.5
+        self.fps =  (1.0/(time_now - self.last_time_stamp))*2.2
         self.fps_depth = (1.0/(time_now - self.last_time_stamp)) *2.5 #TODO This is the fps for translational motion (depth) only
 
         self.last_time_stamp = time_now
@@ -352,11 +352,11 @@ class BYTETracker(object):
         strack_pool = joint_stracks(tracked_stracks, self.lost_stracks)
         if len(tracked_stracks) > 0:
             track_print = tracked_stracks[-1]
-            print(
-                f"track id: {track_print.track_id:>2}, \
-                    x: {track_print.mean[0]:>5.2f}, x_dot: {track_print.mean[4]:>5.2f}, x_cov: {track_print.covariance[0,0]:>5.2f} \
-                    y: {track_print.mean[1]:>5.2f}, y_dot: {track_print.mean[5]:>5.2f}, y_cov: {track_print.covariance[1,1]:>5.2f}\
-                        , current_yaw_dot:   {STrack.current_yaw_dot:>5.2f}")
+            # print(
+            #     f"track id: {track_print.track_id:>2}, \
+            #         x: {track_print.mean[0]:>5.2f}, x_dot: {track_print.mean[4]:>5.2f}, x_cov: {track_print.covariance[0,0]:>5.2f} \
+            #         y: {track_print.mean[1]:>5.2f}, y_dot: {track_print.mean[5]:>5.2f}, y_cov: {track_print.covariance[1,1]:>5.2f}\
+            #             , current_yaw_dot:   {STrack.current_yaw_dot:>5.2f}")
             # print (f"track id: , {track_print.track_id:>5},  x_dot:  , {100*track_print.mean[4]:>5.2f}, x_cov:  {track_print.covariance[0,0]:>5.2f} , current_yaw_dot:   {100*STrack.current_yaw_dot:>5.2f}", flush=True)
 
         if self.write_log:
@@ -433,8 +433,8 @@ class BYTETracker(object):
 
         for it in u_track:
             track = r_tracked_stracks[it]
-            if len(track.mean_history) > 0:
-                track.update_dummy_2()
+            # if len(track.mean_history) > 0:
+            #     track.update_dummy_2()
             if not track.state == TrackState.Lost:
                 track.mark_lost()
                 lost_stracks.append(track)

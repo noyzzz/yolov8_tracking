@@ -34,6 +34,8 @@ import subprocess
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # yolov5 strongsort root directory
 WEIGHTS = ROOT / 'weights'
+np.random.seed(0)
+torch.manual_seed(0)
 
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
@@ -120,7 +122,7 @@ def run(
         ros_package = 0,
         ros_bag = 1,
 ):
-    OP_MODE = "EVAL"
+    OP_MODE = "EVAL" #YOLO or EVAL; EVAL uses the ground truth detections
     is_ros = isinstance(source, image_converter)
     #copy source to avoid changing the original
     source_copy = copy.copy(source)
@@ -142,6 +144,8 @@ def run(
         exp_name = 'ensemble'
     exp_name = name if name else exp_name + "_" + reid_weights.stem
     save_dir = increment_path(Path(project) / exp_name, exist_ok=exist_ok)  # increment run
+    # what is the name of last child folder of save_dir
+    text_file_name = save_dir.name
     (save_dir / 'tracks' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
 
     # Load model
@@ -262,7 +266,7 @@ def run(
                     save_path = str(save_dir / p.parent.name)  # im.jpg, vid.mp4, ...
             curr_frames[i] = im0
             # if not is_ros:
-            txt_path = str(save_dir / 'tracks' / txt_file_name)  # im.txt
+            txt_path = str(project / text_file_name / text_file_name)  # im.txt
             s += '%gx%g ' % im.shape[2:]  # print string
             imc = im0.copy() if save_crop else im0  # for save_crop
 
@@ -327,7 +331,7 @@ def run(
                         #convert modified_gt_list to torch tensor
                         #generate a random number with probability 0.7
                         output_random = np.random.rand()
-                    if len(modified_gt_list) > 0:# and output_random < 0.7:
+                    if len(modified_gt_list) and output_random < 1.0:
                         modified_gt_list = torch.cat(modified_gt_list, dim=0)
                         # modified_gt_list = add_noise2tensor(modified_gt_list, 3) 
                     else:
@@ -373,7 +377,10 @@ def run(
             
             save_gt = True
             gt_path = str(save_dir / "gt")  # im.txt
-            if save_gt and len(modified_gt_list) > 0:
+            # if gt_path does not exist, create it
+            if not os.path.exists(gt_path):
+                os.makedirs(gt_path)
+            if save_gt and len(modified_annotation_gt_list) > 0:
                 for gt in modified_annotation_gt_list:
                     this_frame_idx = frame_idx
                     this_id = gt[0]
@@ -382,7 +389,7 @@ def run(
                     this_w = gt[3] - gt[1]
                     this_h = gt[4] - gt[2]
                     this_msg = [this_frame_idx+1, this_id, this_x, this_y, this_w, this_h, 1, 1, 1]
-                    with open(gt_path + '.txt', 'a') as f:
+                    with open(gt_path + '/gt.txt', 'a') as f:
                         f.write(('%g ' * 9 + '\n') % tuple(this_msg))
 
 
@@ -440,6 +447,7 @@ def run(
                         tracker_list[i].trajectory(im0, q, color=color)
                     if save_crop:
                         txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
+                        if c == -1: c = 1 #if no detection just save with class 1 for visualization
                         save_one_box(np.array(bbox, dtype=np.int16), imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{j}.jpg', BGR=True)
                             
                 
@@ -514,7 +522,45 @@ def run(
     if update:
         strip_optimizer(yolo_weights)  # update model (to fix SourceChangeWarning)
 
+    with open(save_dir / 'seqinfo.ini', 'w') as file:
+        file.write('[Sequence]\n')
+        file.write('name=' + text_file_name + '\n')
+        file.write('imDir=img1\n')
+        file.write('frameRate=30\n')
+        file.write('seqLength=' + str(int(frame_idx*40) + 1) + '\n')
+        file.write('imWidth=' + str(im0.shape[1]) + '\n')
+        file.write('imHeight=' + str(im0.shape[0]) + '\n')
+        file.write('imExt=.jpg\n')
+    
+    # /home/rosen/TrackEval/scripts/run_mot_challenge.py
+    p = subprocess.Popen(
+        args=[
+            sys.executable, Path('scripts') / 'run_mot_challenge.py',
+            "--GT_FOLDER", str(project),
+            "--BENCHMARK", "",
+            "--TRACKERS_FOLDER", save_dir,   # project/name
+            "--TRACKERS_TO_EVAL", "mot",  # project/name/mot
+            "--SPLIT_TO_EVAL", "train",
+            "--METRICS", "HOTA", "CLEAR", "Identity",
+            "--USE_PARALLEL", "False",
+            "--TRACKER_SUB_FOLDER", "",
+            "--NUM_PARALLEL_CORES", "4",
+            "--SKIP_SPLIT_FOL", "True",
+            "--SEQ_INFO", *[str(text_file_name)]
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+    stdout, stderr = p.communicate()
 
+    # Check the return code of the subprocess
+    if p.returncode != 0:
+        LOGGER.error(stderr)
+        LOGGER.error(stdout)
+        sys.exit(1)
+
+    LOGGER.info(stdout)
 def parse_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--yolo-weights', nargs='+', type=Path, default=WEIGHTS / 'yolov8s-seg.pt', help='model.pt path(s)')
@@ -540,7 +586,7 @@ def parse_opt():
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     parser.add_argument('--visualize', action='store_true', help='visualize features')
     parser.add_argument('--update', action='store_true', help='update all models')
-    parser.add_argument('--project', default=ROOT / 'runs' / 'track', help='save results to project/name')
+    parser.add_argument('--project', default=ROOT / 'runs' / 'mot_eval', help='save results to project/name')
     parser.add_argument('--name', default='exp', help='save results to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--line-thickness', default=2, type=int, help='bounding box thickness (pixels)')

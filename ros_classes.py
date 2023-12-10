@@ -15,7 +15,7 @@ from collections import deque
 class image_converter:
     def __init__(self, is_track_publish_activated=0):
     #initialize a queue to store cv_image from callback
-        DELAY_FRAMES = 3
+        DELAY_FRAMES = 1
         self.cv_image_queue = queue.Queue()
         self.sim_reset_queue = queue.Queue()
         self.depth_image_queue = queue.Queue()
