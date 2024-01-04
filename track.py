@@ -60,17 +60,31 @@ from yolov8.ultralytics.yolo.utils.plotting import Annotator, colors, save_one_b
 from trackers.multi_tracker_zoo import create_tracker
 from ros_classes import image_converter
 
-def add_noise2tensor(tensor, noise_std):
+def add_noise2tensor(tensor, image_shape, noise_scale=9/10):
     """
     tensor: [N, 6]
     """
-    noise = torch.randn_like(tensor) * noise_std
-    tensor[:, :4] += noise[:, :4]
+    noise = torch.randn_like(tensor) * noise_scale
+    # add (tensor[:, :2] - tensor[:, :0]) * noise to tensor[:, :2]
+    tensor[:, 0] += (tensor[:, 2] - tensor[:, 0]) * noise[:,0]
+    tensor[:, 1] += (tensor[:, 2] - tensor[:, 0]) * noise[:,1]
+    tensor[:, 2] += (tensor[:, 3] - tensor[:, 1]) * noise[:,2]
+    tensor[:, 3] += (tensor[:, 3] - tensor[:, 1]) * noise[:,3]
+    
+    # tensor[:, :4] += noise[:, :4]
+    # clip the tensor[:, :4] to be in the range of image_shape
+    tensor[:, 0] = torch.clamp(tensor[:, 0], 0, image_shape[1])
+    tensor[:, 1] = torch.clamp(tensor[:, 1], 0, image_shape[0])
+    tensor[:, 2] = torch.clamp(tensor[:, 2], 0, image_shape[1])
+    tensor[:, 3] = torch.clamp(tensor[:, 3], 0, image_shape[0])
+    #make sure that the width and height are positive not even 0
+    tensor[:, 2] = torch.max(tensor[:, 2], tensor[:, 0] + 1)
+    tensor[:, 3] = torch.max(tensor[:, 3], tensor[:, 1] + 1)
     return tensor
 
 def play_bag(is_ros_bag):
     if is_ros_bag:
-        player_state = subprocess.Popen(["rosbag", "play", "-l", "/home/rosen/tracking_catkin_ws/src/my_tracker/bags/carla_stationary_obj_slow.bag"])
+        player_state = subprocess.Popen(["rosbag", "play", "/home/rosen/tracking_catkin_ws/src/my_tracker/bags/carla_stationary_obj_slow.bag"])
 
 def get_intersection(bbox, image_bbox):
     """
@@ -121,8 +135,9 @@ def run(
         retina_masks=False,
         ros_package = 0,
         ros_bag = 1,
+        op_mode = "eval"
 ):
-    OP_MODE = "EVAL" #YOLO or EVAL; EVAL uses the ground truth detections
+    # OP_MODE = "EVAL" #YOLO or EVAL; EVAL uses the ground truth detections
     is_ros = isinstance(source, image_converter)
     #copy source to avoid changing the original
     source_copy = copy.copy(source)
@@ -142,7 +157,7 @@ def run(
         exp_name = Path(yolo_weights[0]).stem
     else:  # multiple models after --yolo_weights
         exp_name = 'ensemble'
-    exp_name = name if name else exp_name + "_" + reid_weights.stem
+    exp_name = name+'_'+tracking_method+'_'+op_mode if name else exp_name + "_" + reid_weights.stem
     save_dir = increment_path(Path(project) / exp_name, exist_ok=exist_ok)  # increment run
     # what is the name of last child folder of save_dir
     text_file_name = save_dir.name
@@ -240,7 +255,9 @@ def run(
                 nms_dets_list = non_max_suppression(preds, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
 
 
-            
+        # mkdir save_path = str(save_dir / txt_file_name /
+        # if not os.path.exists(str(project)):
+        #     os.mkdir(str(project))
         # Process detections
         for i, det in enumerate(nms_dets_list):  # detections per image
             seen += 1
@@ -317,6 +334,9 @@ def run(
                     gt_list = extra_output["gt"]
                     for gt in gt_list:
                         gt_vals = list(gt.values())
+                        # if gt_vals[0] == 11 or gt_vals[0] == 94:
+                        #     print("*******************************removing ids 11 and 94*****************************************")
+                        #     continue
                         this_xyxy = gt_vals[1:5]
                         #if xyxy is out of the image or if any of them is nan or negative, skip it
                         if this_xyxy[0] < 0 or this_xyxy[1] < 0 or this_xyxy[2] > im0.shape[1] or this_xyxy[3] > im0.shape[0] or np.isnan(this_xyxy).any():
@@ -331,22 +351,22 @@ def run(
                         #convert modified_gt_list to torch tensor
                         #generate a random number with probability 0.7
                         output_random = np.random.rand()
-                    if len(modified_gt_list) and output_random < 1.0:
+                    if len(modified_gt_list) and output_random < 0.6:
                         modified_gt_list = torch.cat(modified_gt_list, dim=0)
-                        # modified_gt_list = add_noise2tensor(modified_gt_list, 3) 
+                        modified_gt_list = add_noise2tensor(modified_gt_list, [im0.shape[0], im0.shape[1]], 0.10) 
                     else:
                         modified_gt_list = torch.empty((0,6))
                 outputs[i] = None
                 track_pred_tlwhs = None
                 if hasattr(tracker_list[i], "use_depth") and hasattr(tracker_list[i], "use_odometry") and tracker_list[i].use_depth and tracker_list[i].use_odometry:
-                    if OP_MODE == "YOLO":
+                    if op_mode == "yolo":
                         outputs[i] = tracker_list[i].update(det.cpu(), im0, depth_image, odom, None)
-                    elif OP_MODE == "EVAL":
+                    elif op_mode == "eval":
                         outputs[i] = tracker_list[i].update(modified_gt_list, im0, depth_image, odom, None)
                 else:
-                    if OP_MODE == "YOLO":
+                    if op_mode == "yolo":
                         outputs[i] = tracker_list[i].update(det.cpu(), im0)
-                    elif OP_MODE == "EVAL":
+                    elif op_mode == "eval":
                         outputs[i] = tracker_list[i].update(modified_gt_list, im0)
             #     track_pred_tlwhs = tracker_list[i].get_all_track_predictions()
 
@@ -457,7 +477,7 @@ def run(
             #create  subfolder of frames in save_dir
 
 
-            save_path = str(save_dir / txt_file_name / f'{frame_idx}.jpg')
+            save_path = str(save_dir/ 'tracks'/ f'{frame_idx}.jpg')
             cv2.imwrite(save_path, im0)
 
             if ros_package == "1": #it means that the image_detection message type is being generated and published
@@ -599,6 +619,7 @@ def parse_opt():
     parser.add_argument('--retina-masks', action='store_true', help='whether to plot masks in native resolution')
     parser.add_argument('--ros-package', type=str, default='0', help='is this running in a ros package')
     parser.add_argument('--ros-bag', type=str, default='0', help='run ros bag')
+    parser.add_argument('--op-mode', type=str, default='eval', help='get detection from "yolo" or from "eval" ground truth')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     opt.tracking_config = ROOT / 'trackers' / opt.tracking_method / 'configs' / (opt.tracking_method + '.yaml')

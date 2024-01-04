@@ -13,23 +13,20 @@
                 "yolov8x.pt",
                 "--img",
                 "320",
-                "--tracking-method",
-                "deepocsort bytetrack",
+                "--tracking-method",   "emap",
                 "--show-vid",
-                "--name",
-                "deepocsort70-noise3",
+                "--name",       "day_dummy_sc3",
                 "--save-txt",
                 "--ros-package",
                 "1",
                 "--ros-bag",
                 "0",
+                "--op-mode", "eval",
                 "--classes",
                 "0",
-                "1",
                 "2",
-                "3",
                 "5",
-                "7"
+                "7",
             ]
         }
     ]

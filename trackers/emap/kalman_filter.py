@@ -248,7 +248,7 @@ class KalmanFilter(object):
             Returns the mean vector and covariance matrix of the predicted
             state. Unobserved velocities are initialized to 0 mean.
         """
-        use_control_signal = False
+        use_control_signal = True
         #define x_dis_to_end, y_dis_to_end, x_dis_to_start, y_dis_to_start
         x_dis_to_end = np.abs(self.image_width - mean[:, 0])
         x_dis_to_start = np.abs(mean[:, 0])

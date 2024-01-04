@@ -145,7 +145,7 @@ class LoadStreams:
     def __next__(self):
         #if it's a ros node the output will also include the simulation reset signal
         if isinstance(self.sources[0], image_converter):
-            lock_success = self.lock_extra.acquire(timeout=2.0)
+            lock_success = self.lock_extra.acquire(timeout=self.time_out)
             if not lock_success:
                 raise StopIteration
         self.count += 1

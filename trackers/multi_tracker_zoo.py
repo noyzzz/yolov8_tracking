@@ -48,6 +48,16 @@ def create_tracker(tracker_type, tracker_config, reid_weights, device, half):
         )
         return bytetracker
     
+    elif tracker_type == 'emap':
+        from trackers.emap.byte_tracker import BYTETracker
+        bytetracker = BYTETracker(
+            track_thresh=cfg.emap.track_thresh,
+            match_thresh=cfg.emap.match_thresh,
+            track_buffer=cfg.emap.track_buffer,
+            frame_rate=cfg.emap.frame_rate
+        )
+        return bytetracker
+    
     elif tracker_type == 'unsvstrack':
         from trackers.unsvstracker.unsvs_tracker import UnsVSTrack
         bytetracker = UnsVSTrack(

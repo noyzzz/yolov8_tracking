@@ -17,15 +17,19 @@ class image_converter:
     #initialize a queue to store cv_image from callback
         DELAY_FRAMES = 1
         self.cv_image_queue = queue.Queue()
+        self.cv_image_internal_queue = deque(maxlen=DELAY_FRAMES)
         self.sim_reset_queue = queue.Queue()
         self.depth_image_queue = queue.Queue()
+        self.depth_image_internal_queue = deque(maxlen=DELAY_FRAMES)
         self.odom_queue = queue.Queue()
+        self.odom_internal_queue = deque(maxlen=DELAY_FRAMES)
         self.gt_queue = queue.Queue()
-        self.gt_internal_queue = deque(maxlen=DELAY_FRAMES)
+        self.gt_internal_queue = deque(maxlen=1)
+
         self.is_track_publish_activated = is_track_publish_activated
         if self.is_track_publish_activated == 1:
             from my_tracker.msg import ImageDetectionMessage
-            self.track_publisher = rospy.Publisher("/image_tracks",ImageDetectionMessage)
+            self.track_publisher = rospy.Publisher("/image_tracks",ImageDetectionMessage, queue_size=10)
 
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("/camera/color/image_raw/compressed",CompressedImage,self.callback)
@@ -53,8 +57,11 @@ class image_converter:
     def callback(self,data):
         try:
             cv_image = self.bridge.compressed_imgmsg_to_cv2(data, "passthrough")
+            self.cv_image_internal_queue.append(cv_image)
+            self.cv_image_queue.put(self.cv_image_internal_queue[0])
+            
             # cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
-            self.cv_image_queue.put(cv_image)
+            # self.cv_image_queue.put(cv_image)
         except CvBridgeError as e:
             print(e)
 
@@ -64,12 +71,22 @@ class image_converter:
             # cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
             #data is Float32MultiArray and has a layout, convert it to numpy array
             # cv_image = np.array(data.data).reshape(data.layout.dim[0].size,data.layout.dim[1].size)
-            self.depth_image_queue.put(cv_image)
+            self.depth_image_internal_queue.append(cv_image)
+            self.depth_image_queue.put(self.depth_image_internal_queue[0])
+            # self.depth_image_queue.put(cv_image)
         except CvBridgeError as e:
             print(e)
 
     def odom_callback(self,data):
-        self.odom_queue.put(data)
+        self.odom_internal_queue.append(data)
+        self.odom_queue.put(self.odom_internal_queue[0])
+        # if len(self.odom_internal_queue) > 1:
+        #     if np.abs(self.odom_internal_queue[0].header.stamp.to_time() - self.odom_internal_queue[1].header.stamp.to_time()) < 1e-5:
+        #         print("*********************timestamp of odom headers the same**************************")
+            # if hash(str(self.odom_internal_queue[0])) == hash(str(self.odom_internal_queue[1])):
+            #     print("*********************odom headers the same**************************")
+
+        # self.odom_queue.put(data)
 
 
 

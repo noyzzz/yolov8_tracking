@@ -9,9 +9,9 @@ from typing import List, Tuple, Dict
 from yolov8.ultralytics.yolo.utils.ops import xywh2xyxy, xyxy2xywh
 
 
-from trackers.bytetrack.kalman_filter import KalmanFilter
-from trackers.bytetrack import matching
-from trackers.bytetrack.basetrack import BaseTrack, TrackState
+from trackers.emap.kalman_filter import KalmanFilter
+from trackers.emap import matching
+from trackers.emap.basetrack import BaseTrack, TrackState
 import time
 from torch.utils.tensorboard import SummaryWriter
 import datetime
@@ -285,7 +285,7 @@ class BYTETracker(object):
         if time_now - self.last_time_stamp == 0:
             self.fps = 25
             self.fps_depth = 25
-            print(f"odom header time stamp at {self.frame_id} is the same as the last time stamp")
+            print(f"odom header time stamp at {self.frame_id} is the same as the lasts time stamp")
         else:
             self.fps =  (1.0/(time_now - self.last_time_stamp))*1
             self.fps_depth = (1.0/(time_now - self.last_time_stamp)) *1 #TODO This is the fps for translational motion (depth) only
@@ -439,8 +439,8 @@ class BYTETracker(object):
 
         for it in u_track:
             track = r_tracked_stracks[it]
-            # if len(track.mean_history) > 0:
-            #     track.update_dummy()
+            if len(track.mean_history) > 0:
+                track.update_dummy()
             if not track.state == TrackState.Lost:
                 track.mark_lost()
                 lost_stracks.append(track)
