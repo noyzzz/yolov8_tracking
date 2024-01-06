@@ -120,6 +120,7 @@ class KalmanBoxTracker(object):
         #get the median of the depth values in the bounding box excluding the zeros and the nans
         #return the depth value
         bounding_box = copy.deepcopy(self.get_tlwh())
+        print("bounding_box: ", bounding_box)
         #get the depth of the bounding box in the depth image
         #clip the bounding box to the image size and remove the negative values
         bounding_box[bounding_box < 0] = 0
@@ -213,7 +214,7 @@ class KalmanBoxTracker(object):
             self.kf.x[6] *= 0.0
         
         control_input = np.array([KalmanBoxTracker.current_yaw_dot, KalmanBoxTracker.current_D_dot, self.get_d1()])
-        self.kf.predict()
+        self.kf.predict(control_input = control_input)
         self.age += 1
         if(self.time_since_update > 0):
             self.hit_streak = 0
@@ -318,6 +319,8 @@ class OCSort(object):
         trks = np.zeros((len(self.trackers), 5))
         to_del = []
         ret = []
+        control_input = np.array([KalmanBoxTracker.current_yaw_dot, KalmanBoxTracker.current_D_dot])
+        # print("control_input 'ocsort' is : ", control_input)
         for t, trk in enumerate(trks):
             pos = self.trackers[t].predict()[0]
             trk[:] = [pos[0], pos[1], pos[2], pos[3], 0]

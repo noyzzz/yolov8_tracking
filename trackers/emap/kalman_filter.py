@@ -278,6 +278,9 @@ class KalmanFilter(object):
             mean_trans_applied = np.dot(control_signal[i][1], depth_control_mat.T)[0]
             if use_control_signal:
                 mean[i] = np.dot(mean[i], this_motion_mat.T) + mean_rot_applied + mean_trans_applied
+                # if np.sum(mean_rot_applied) > 20 or np.sum(mean_trans_applied) > 20:
+                # print("mean_rot_applied: ", mean_rot_applied[0])
+                # print("mean_trans_applied", mean_trans_applied[0:7].reshape(7,1))
                 covariance[i] = np.linalg.multi_dot((
                     this_motion_mat, covariance[i], this_motion_mat.T)) + this_motion_cov
             else:

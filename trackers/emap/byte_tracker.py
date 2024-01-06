@@ -51,6 +51,7 @@ class STrack(BaseTrack):
         if self.state != TrackState.Tracked and self.state != TrackState.New and self.bb_depth is not None:
             return self.bb_depth
         bounding_box = copy.deepcopy(self.tlwh)
+        # print("bounding_box: ", bounding_box)
         #get the depth of the bounding box in the depth image
         #clip the bounding box to the image size and remove the negative values
         bounding_box[bounding_box < 0] = 0
@@ -116,6 +117,7 @@ class STrack(BaseTrack):
                     multi_mean[i][7] = 0
             # create a n*3 array of yaw_dot, current_D_dot and depth
             control_input = np.array([[STrack.current_yaw_dot, STrack.current_D_dot, st.get_d1() ]for st in stracks])
+            # print("control input 'emap' is ", control_input)
             multi_mean, multi_covariance = STrack.shared_kalman.multi_predict(multi_mean, multi_covariance, control_input)
             for i, (mean, cov) in enumerate(zip(multi_mean, multi_covariance)):
                 stracks[i].mean = mean

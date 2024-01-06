@@ -334,9 +334,11 @@ def run(
                     gt_list = extra_output["gt"]
                     for gt in gt_list:
                         gt_vals = list(gt.values())
-                        # if gt_vals[0] == 11 or gt_vals[0] == 94:
-                        #     print("*******************************removing ids 11 and 94*****************************************")
+                        ### TESTING ONLY WITH ID #1
+                        # if gt_vals[0] != 70:
+                        # #     print("*******************************removing ids 11 and 94*****************************************")
                         #     continue
+
                         this_xyxy = gt_vals[1:5]
                         #if xyxy is out of the image or if any of them is nan or negative, skip it
                         if this_xyxy[0] < 0 or this_xyxy[1] < 0 or this_xyxy[2] > im0.shape[1] or this_xyxy[3] > im0.shape[0] or np.isnan(this_xyxy).any():

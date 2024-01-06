@@ -334,9 +334,38 @@ class KalmanFilterNew(object):
 
         self.attr_saved = None
         self.observed = False 
+        IMG_WIDTH = 960
+        IMG_HEIGHT = 540
+        FOCAL_LENGTH = 480.0
+        self.image_width, self.image_height, self.focal_length = IMG_WIDTH, IMG_HEIGHT, FOCAL_LENGTH
+        self.dt = 1
+        self.control_mat = np.zeros((7, 1))
 
+    def calculate_control_mat(self, mean):
+        u1 = mean[0] - self.image_width/2
+        robot_yaw_to_pixel_coeff = (u1**2/self.focal_length**2 + 1)*self.focal_length
+        self.control_mat[0, 0] = robot_yaw_to_pixel_coeff*self.dt
+        return self.control_mat
+    
+    def calculate_depth_control_mat(self, mean, control_signal):
+        if control_signal[2] == 0:
+            return np.zeros((7, 1))
+        u1 = mean[0] - self.image_width/2
+        v1 = mean[1] - self.image_height/2
+        w = np.sqrt(mean[2] * mean[3])
+        h = mean[2] / w
+        bottom_y = mean[1]+h/2.# v1 + mean[3]/2 #bottom right corner y wrt image center
+        u_coeff = u1*np.sqrt(u1**2 + self.focal_length**2)/(self.focal_length * control_signal[2])
+        v_coeff = v1*np.sqrt(v1**2 + self.focal_length**2)/(self.focal_length * control_signal[2])
+        h_coeff = (bottom_y*np.sqrt(bottom_y**2 + self.focal_length**2) - v1*np.sqrt(v1**2 + self.focal_length**2))\
+                   /(self.focal_length * control_signal[2])
+        depth_control_mat = np.zeros((7, 1))
+        depth_control_mat[0, 0] = u_coeff
+        depth_control_mat[1, 0] = v_coeff
+        depth_control_mat[3, 0] = 0#h_coeff FIXME: this is not correct, this is not h_coeff because the state definition here is not x, y, w, h
+        return depth_control_mat
 
-    def predict(self, u=None, B=None, F=None, Q=None):
+    def predict(self, u=None, B=None, F=None, Q=None, control_input=None):
         """
         Predict next state (prior) using the Kalman filter state propagation
         equations.
@@ -368,6 +397,17 @@ class KalmanFilterNew(object):
         # x = Fx + Bu
         if B is not None and u is not None:
             self.x = dot(F, self.x) + dot(B, u)
+        # check if self.x is in image range with respect to IMAG_WIDTH and IMAGE_HEIGHT
+        elif control_input is not None and self.x[0] > 0 and self.x[0] < self.image_width and self.x[1] > 0 and self.x[1] < self.image_height:
+            this_control_mat = self.calculate_control_mat(self.x) # B matrix
+            mean_rot_applied = np.dot(control_input[0], this_control_mat.T)[0]
+            depth_control_mat = self.calculate_depth_control_mat(self.x, control_input)
+            mean_trans_applied = np.dot(control_input[1], depth_control_mat.T)[0]
+            self.x = dot(F, self.x) + mean_rot_applied[0:7].reshape(7,1) + mean_trans_applied[0:7].reshape(7,1)
+            # if np.sum(mean_rot_applied) > 20 or np.sum(mean_trans_applied) > 20:
+            # print("mean_rot_applied: ", mean_rot_applied[0])
+            # print("mean_trans_applied", mean_trans_applied[0:7].reshape(7,1))
+                # print("depth_control_mat", depth_control_mat)
         else:
             self.x = dot(F, self.x)
 
