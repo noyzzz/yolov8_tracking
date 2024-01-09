@@ -340,7 +340,7 @@ class KalmanFilterNew(object):
         FOCAL_LENGTH = 480.0
         self.image_width, self.image_height, self.focal_length = IMG_WIDTH, IMG_HEIGHT, FOCAL_LENGTH
         self.dt = 1
-        self.control_mat = np.zeros((7, 1))
+        self.control_mat = np.zeros((8, 1))
         self.last_measurement = None
 
     def calculate_control_mat(self, mean):
@@ -351,7 +351,7 @@ class KalmanFilterNew(object):
     
     def calculate_depth_control_mat(self, mean, control_signal):
         if control_signal[2] == 0:
-            return np.zeros((7, 1))
+            return np.zeros((8, 1))
         u1 = mean[0] - self.image_width/2
         v1 = mean[1] - self.image_height/2
         w = np.sqrt(mean[2] * mean[3])
@@ -361,7 +361,7 @@ class KalmanFilterNew(object):
         v_coeff = v1*np.sqrt(v1**2 + self.focal_length**2)/(self.focal_length * control_signal[2])
         h_coeff = (bottom_y*np.sqrt(bottom_y**2 + self.focal_length**2) - v1*np.sqrt(v1**2 + self.focal_length**2))\
                    /(self.focal_length * control_signal[2])
-        depth_control_mat = np.zeros((7, 1))
+        depth_control_mat = np.zeros((8, 1))
         depth_control_mat[0, 0] = u_coeff
         depth_control_mat[1, 0] = v_coeff
         depth_control_mat[3, 0] = 0#h_coeff FIXME: this is not correct, this is not h_coeff because the state definition here is not x, y, w, h
@@ -404,10 +404,10 @@ class KalmanFilterNew(object):
             mean_rot_applied = np.dot(control_input[0], this_control_mat.T)[0]
             depth_control_mat = self.calculate_depth_control_mat(self.x, control_input)
             mean_trans_applied = np.dot(control_input[1], depth_control_mat.T)[0]
-            self.x = dot(F, self.x) + mean_rot_applied[0:7].reshape(7,1) + mean_trans_applied[0:7].reshape(7,1)
+            self.x = dot(F, self.x) + mean_rot_applied[0:8].reshape(8,1) + mean_trans_applied[0:8].reshape(8,1)
             # if np.sum(mean_rot_applied) > 20 or np.sum(mean_trans_applied) > 20:
             # print("mean_rot_applied: ", mean_rot_applied[0])
-            # print("mean_trans_applied", mean_trans_applied[0:7].reshape(7,1))
+            # print("mean_trans_applied", mean_trans_applied[0:8].reshape(8,1))
                 # print("depth_control_mat", depth_control_mat)
         else:
             self.x = dot(F, self.x)

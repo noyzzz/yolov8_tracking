@@ -348,7 +348,8 @@ class KalmanBoxTracker(object):
                 self.kf.x[6] *= 0.0
             Q = None
 
-        self.kf.predict(Q=Q)
+        control_input = np.array([KalmanBoxTracker.current_yaw_dot, KalmanBoxTracker.current_D_dot, self.get_d1()])                                            
+        self.kf.predict(Q=Q, control_input=control_input)
         self.age += 1
         if self.time_since_update > 0:
             self.hit_streak = 0
@@ -454,7 +455,7 @@ class OCSort(object):
         self.last_time_stamp = time_now
         # print("fps: ", self.fps)
 
-    def update(self, dets, img_numpy, tag='blub', depth_image = None, odom = None, masks = None):
+    def update(self, dets, img_numpy, depth_image = None, odom = None, masks = None):
         """
         Params:
           dets - a numpy array of detections in the format [[x1,y1,x2,y2,score],[x1,y1,x2,y2,score],...]
@@ -462,6 +463,7 @@ class OCSort(object):
         Returns the a similar array, where the last column is the object ID.
         NOTE: The number of objects returned may differ from the number of detections provided.
         """
+        tag='blub'
         self.update_time(odom)
         KalmanBoxTracker.update_ego_motion(odom, self.fps, self.fps_depth)
         KalmanBoxTracker.update_depth_image(depth_image)
