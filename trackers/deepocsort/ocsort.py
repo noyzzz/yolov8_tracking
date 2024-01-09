@@ -18,6 +18,8 @@ from .association import *
 from .embedding import EmbeddingComputer
 from .cmc import CMCComputer
 from reid_multibackend import ReIDDetectMultiBackend
+from collections import deque
+import copy
 
 
 def k_previous_obs(observations, cur_age, k):
@@ -100,6 +102,11 @@ class KalmanBoxTracker(object):
     """
 
     count = 0
+    current_yaw = 0;
+    current_yaw_dot = 0;
+    current_yaw_dot_filtered = 0;
+    current_depth_image = None
+    yaw_dot_list = deque(maxlen=2)
 
     def __init__(self, bbox, cls, delta_t=3, orig=False, emb=None, alpha=0, new_kf=False):
         """
@@ -112,6 +119,7 @@ class KalmanBoxTracker(object):
         else:
             from filterpy.kalman import KalmanFilter
         self.cls = cls
+        self.bb_depth = None
         self.conf = bbox[-1]
         self.new_kf = new_kf
         if new_kf:
@@ -200,6 +208,59 @@ class KalmanBoxTracker(object):
         self.emb = emb
 
         self.frozen = False
+
+    def get_d1(self):
+        #calculate the depth of the object in the depth image
+        #get the bounding box of the object in the depth image
+        #get the median of the depth values in the bounding box excluding the zeros and the nans
+        #return the depth value
+        bounding_box = copy.deepcopy(self.get_tlwh())
+        #get the depth of the bounding box in the depth image
+        #clip the bounding box to the image size and remove the negative values
+        bounding_box[bounding_box < 0] = 0
+        bounding_box[np.isnan(bounding_box)] = 0
+        #if any of the bounding values is inf then set it to zero
+        # bounding_box[np.isinf(bounding_box)] = 0
+        track_depth = copy.deepcopy(KalmanBoxTracker.current_depth_image)[int(bounding_box[1]):int(bounding_box[1]+bounding_box[3]), int(bounding_box[0]):int(bounding_box[0]+bounding_box[2])]
+        #get the median of the depth values in the bounding box excluding the zeros and the nans
+        track_depth = track_depth[track_depth != 0]
+        track_depth = track_depth[~np.isnan(track_depth)]
+        if len(track_depth) == 0:
+            return 0
+        self.bb_depth = np.median(track_depth)
+        return self.bb_depth
+
+    def update_depth_image(depth_image):
+        #convert depth image type to float32
+        depth_image = depth_image.astype(np.float32)
+        depth_image/=10
+        KalmanBoxTracker.current_depth_image = depth_image
+
+    def update_ego_motion(odom, fps_rot, fps_depth):
+        quat = False
+        if quat:
+            quaternion = (odom.pose.pose.orientation.x, odom.pose.pose.orientation.y,
+                    odom.pose.pose.orientation.z, odom.pose.pose.orientation.w)
+            #get the yaw from the quaternion not using the tf library
+            yaw = np.arctan2(2.0 * (quaternion[3] * quaternion[2] + quaternion[0] * quaternion[1]),
+                            1.0 - 2.0 * (quaternion[1] * quaternion[1] + quaternion[2] * quaternion[2]))
+        else:
+            yaw = odom.pose.pose.orientation.z
+        while  abs(yaw-KalmanBoxTracker.current_yaw) > np.pi :
+            if yaw < KalmanBoxTracker.current_yaw :
+                yaw += 2*np.pi
+            else:
+                yaw -= 2*np.pi
+        twist = odom.twist.twist
+        KalmanBoxTracker.current_yaw_dot = twist.angular.z / fps_rot # frames are being published at 20Hz in the simulator
+        KalmanBoxTracker.yaw_dot_list.append(KalmanBoxTracker.current_yaw_dot)
+        KalmanBoxTracker.current_yaw = yaw
+        KalmanBoxTracker.current_yaw_dot_filtered = np.mean(KalmanBoxTracker.yaw_dot_list)
+        raw_x_dot = twist.linear.x
+        raw_y_dot = twist.linear.y
+        x_dot = raw_x_dot*np.cos(KalmanBoxTracker.current_yaw)+raw_y_dot*np.sin(KalmanBoxTracker.current_yaw)
+        y_dot = -raw_x_dot*np.sin(KalmanBoxTracker.current_yaw)+raw_y_dot*np.cos(KalmanBoxTracker.current_yaw)
+        KalmanBoxTracker.current_D_dot = x_dot / fps_depth
 
     def update(self, bbox, cls):
         """
@@ -300,6 +361,14 @@ class KalmanBoxTracker(object):
         Returns the current bounding box estimate.
         """
         return self.x_to_bbox_func(self.kf.x)
+    
+    def get_tlwh(self):
+        """
+        Returns the current bounding box in tlwh format [top left x, top left y, width, height].
+        """
+        bbox = convert_x_to_bbox(self.kf.x)
+        tlwh = np.array([bbox[0, 0], bbox[0, 1], bbox[0, 2]-bbox[0, 0], bbox[0, 3]-bbox[0, 1]])
+        return tlwh
 
     def mahalanobis(self, bbox):
         """Should be run after a predict() call for accuracy."""
@@ -346,6 +415,7 @@ class OCSort(object):
         """
         Sets key parameters for SORT
         """
+        self.last_time_stamp = 0 #time in seconds
         self.max_age = max_age
         self.min_hits = min_hits
         self.iou_threshold = iou_threshold
@@ -359,6 +429,8 @@ class OCSort(object):
         self.alpha_fixed_emb = alpha_fixed_emb
         self.aw_param = aw_param
         KalmanBoxTracker.count = 0
+        self.use_depth = True
+        self.use_odometry = True
 
         self.embedder = ReIDDetectMultiBackend(weights=model_weights, device=device, fp16=fp16)
         self.cmc = CMCComputer()
@@ -367,7 +439,22 @@ class OCSort(object):
         self.aw_off = aw_off
         self.new_kf_off = new_kf_off
 
-    def update(self, dets, img_numpy, tag='blub'):
+    def update_time(self, odom):
+        current_time = odom.header.stamp.to_time()
+        time_now = current_time
+        if time_now - self.last_time_stamp == 0:
+            self.fps = 25
+            self.fps_depth = 25
+            print(f"odom header time stamp at {self.frame_count} is the same as the lasts time stamp")
+        else:
+            self.fps =  (1.0/(time_now - self.last_time_stamp))*1
+            self.fps_depth = (1.0/(time_now - self.last_time_stamp)) *1 #TODO This is the fps for translational motion (depth) only
+            # print(f'at frame {self.frame_id} fps is {self.fps}')
+
+        self.last_time_stamp = time_now
+        # print("fps: ", self.fps)
+
+    def update(self, dets, img_numpy, tag='blub', depth_image = None, odom = None, masks = None):
         """
         Params:
           dets - a numpy array of detections in the format [[x1,y1,x2,y2,score],[x1,y1,x2,y2,score],...]
@@ -375,6 +462,9 @@ class OCSort(object):
         Returns the a similar array, where the last column is the object ID.
         NOTE: The number of objects returned may differ from the number of detections provided.
         """
+        self.update_time(odom)
+        KalmanBoxTracker.update_ego_motion(odom, self.fps, self.fps_depth)
+        KalmanBoxTracker.update_depth_image(depth_image)
         xyxys = dets[:, 0:4]
         scores = dets[:, 4]
         clss = dets[:, 5]
