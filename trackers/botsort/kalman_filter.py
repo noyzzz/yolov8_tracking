@@ -38,19 +38,49 @@ class KalmanFilter(object):
     """
 
     def __init__(self, image_width, image_height, focal_length, *, params_dict = None):
-        ndim, dt = 4, 1.
-
+        self.ndim, self.dt = 4, 1.
+        self.image_width, self.image_height, self.focal_length = image_width, image_height, focal_length
         # Create Kalman filter model matrices.
-        self._motion_mat = np.eye(2 * ndim, 2 * ndim)
-        for i in range(ndim):
-            self._motion_mat[i, ndim + i] = dt
-        self._update_mat = np.eye(ndim, 2 * ndim)
-
+        self._motion_mat = np.eye(2 * self.ndim, 2 * self.ndim)
+        for i in range(self.ndim):
+            self._motion_mat[i, self.ndim + i] = self.dt
+        self._update_mat = np.eye(self.ndim, 2 * self.ndim)
+        self.control_mat = np.zeros((2 * self.ndim, 1))
         # Motion and observation uncertainty are chosen relative to the current
         # state estimate. These weights control the amount of uncertainty in
         # the model. This is a bit hacky.
         self._std_weight_position = 1. / 20
         self._std_weight_velocity = 1. / 160
+
+    def calculate_motion_mat(self, mean):
+        
+        # u1 = mean[0] - self.image_width/2
+        # robot_yaw_to_pixel_coeff = (u1**2/self.focal_length**2 + 1)*self.focal_length
+        # self._motion_mat[0, 2*self.ndim-1] = robot_yaw_to_pixel_coeff*self.dt
+        # return self._motion_mat\
+        return self._motion_mat
+
+    def calculate_control_mat(self, mean):
+        u1 = mean[0] - self.image_width/2
+        robot_yaw_to_pixel_coeff = (u1**2/self.focal_length**2 + 1)*self.focal_length
+        self.control_mat[0, 0] = robot_yaw_to_pixel_coeff*self.dt
+        return self.control_mat
+    
+    def calculate_depth_control_mat(self, mean, control_signal):
+        if control_signal[2] == 0:
+            return np.zeros((2 * self.ndim, 1))
+        u1 = mean[0] - self.image_width/2
+        v1 = mean[1] - self.image_height/2
+        bottom_y = v1 + mean[3]/2 #bottom right corner y wrt image center
+        u_coeff = u1*np.sqrt(u1**2 + self.focal_length**2)/(self.focal_length * control_signal[2])
+        v_coeff = v1*np.sqrt(v1**2 + self.focal_length**2)/(self.focal_length * control_signal[2])
+        h_coeff = (bottom_y*np.sqrt(bottom_y**2 + self.focal_length**2) - v1*np.sqrt(v1**2 + self.focal_length**2))\
+                   /(self.focal_length * control_signal[2])
+        depth_control_mat = np.zeros((2 * self.ndim, 1))
+        depth_control_mat[0, 0] = u_coeff
+        depth_control_mat[1, 0] = v_coeff
+        depth_control_mat[3, 0] = h_coeff
+        return depth_control_mat
 
     def initiate(self, measurement):
         """Create track from unassociated measurement.
@@ -85,7 +115,7 @@ class KalmanFilter(object):
         covariance = np.diag(np.square(std))
         return mean, covariance
 
-    def predict(self, mean, covariance):
+    def predict(self, mean, covariance, input_signal):
         """Run Kalman filter prediction step.
 
         Parameters
@@ -115,10 +145,12 @@ class KalmanFilter(object):
             self._std_weight_velocity * mean[2],
             self._std_weight_velocity * mean[3]]
         motion_cov = np.diag(np.square(np.r_[std_pos, std_vel]))
+        this_motion_mat = self.calculate_motion_mat(mean) # F matrix
+        this_control_mat = self.calculate_control_mat(mean) # B matrix
 
-        mean = np.dot(mean, self._motion_mat.T)
+        mean = np.dot(mean, this_motion_mat.T) + np.dot(input_signal, this_control_mat.T)
         covariance = np.linalg.multi_dot((
-            self._motion_mat, covariance, self._motion_mat.T)) + motion_cov
+            this_motion_mat, covariance, this_motion_mat.T)) + motion_cov 
 
         return mean, covariance
 
@@ -167,6 +199,7 @@ class KalmanFilter(object):
             Returns the mean vector and covariance matrix of the predicted
             state. Unobserved velocities are initialized to 0 mean.
         """
+        use_control_signal = True
         std_pos = [
             self._std_weight_position * mean[:, 2],
             self._std_weight_position * mean[:, 3],
@@ -181,12 +214,20 @@ class KalmanFilter(object):
 
         motion_cov = []
         for i in range(len(mean)):
-            motion_cov.append(np.diag(sqr[i]))
-        motion_cov = np.asarray(motion_cov)
-
-        mean = np.dot(mean, self._motion_mat.T)
-        left = np.dot(self._motion_mat, covariance).transpose((1, 0, 2))
-        covariance = np.dot(left, self._motion_mat.T) + motion_cov
+            this_motion_cov = np.diag(sqr[i])
+            this_motion_mat = self.calculate_motion_mat(mean[i])
+            this_control_mat = self.calculate_control_mat(mean[i])
+            mean_rot_applied = np.dot(control_signal[i][0], this_control_mat.T)[0]
+            depth_control_mat = self.calculate_depth_control_mat(mean[i], control_signal[i])
+            mean_trans_applied = np.dot(control_signal[i][1], depth_control_mat.T)[0]
+            if use_control_signal:
+                mean[i] = np.dot(mean[i], this_motion_mat.T) + mean_rot_applied + mean_trans_applied
+                covariance[i] = np.linalg.multi_dot((
+                    this_motion_mat, covariance[i], this_motion_mat.T)) + this_motion_cov
+            else:
+                mean[i] = np.dot(mean[i], this_motion_mat.T)
+                covariance[i] = np.linalg.multi_dot((
+                    this_motion_mat, covariance[i], this_motion_mat.T)) + this_motion_cov
 
         return mean, covariance
 

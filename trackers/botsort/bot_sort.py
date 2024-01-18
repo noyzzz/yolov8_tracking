@@ -575,6 +575,10 @@ class BoTSORT(object):
         self.lost_stracks.extend(lost_stracks)
         self.lost_stracks = sub_stracks(self.lost_stracks, self.removed_stracks)
         self.removed_stracks.extend(removed_stracks)
+        #remove from self.lost_stracks the ones that are not in the image boundaries
+        self.lost_stracks = [track for track in self.lost_stracks if track.tlwh[0] > 0 and track.tlwh[1] > 0 and track.tlwh[0]+track.tlwh[2] < self.width and track.tlwh[1]+track.tlwh[3] < self.height]
+        #remove from self.tracked_stracks the ones that are not in the image boundaries
+        self.tracked_stracks = [track for track in self.tracked_stracks if track.tlwh[0] > 0 and track.tlwh[1] > 0 and track.tlwh[0]+track.tlwh[2] < self.width and track.tlwh[1]+track.tlwh[3] < self.height]
         self.tracked_stracks, self.lost_stracks = remove_duplicate_stracks(self.tracked_stracks, self.lost_stracks)
 
         # output_stracks = [track for track in self.tracked_stracks if track.is_activated]
