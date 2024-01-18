@@ -2,6 +2,13 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 from collections import deque
+import os
+import os.path as osp
+import copy
+import torch
+import torch.nn.functional as F
+from typing import List, Tuple, Dict
+from yolov8.ultralytics.yolo.utils.ops import xywh2xyxy, xyxy2xywh
 
 from trackers.botsort import  matching
 from trackers.botsort.gmc import GMC
@@ -12,10 +19,19 @@ from trackers.botsort.kalman_filter import KalmanFilter
 
 from reid_multibackend import ReIDDetectMultiBackend
 from yolov8.ultralytics.yolo.utils.ops import xyxy2xywh, xywh2xyxy
-
+import time
+import datetime
+IMG_WIDTH = 960
+IMG_HEIGHT = 540
+FOCAL_LENGTH = 480.0
 
 class STrack(BaseTrack):
-    shared_kalman = KalmanFilter()
+    current_yaw = 0;
+    current_yaw_dot = 0;
+    current_yaw_dot_filtered = 0;
+    current_depth_image = None
+    yaw_dot_list = deque(maxlen=2)
+    shared_kalman = KalmanFilter(IMG_WIDTH, IMG_HEIGHT, FOCAL_LENGTH)
 
     def __init__(self, tlwh, score, cls, feat=None, feat_history=50):
 
@@ -28,6 +44,9 @@ class STrack(BaseTrack):
         self.cls = -1
         self.cls_hist = []  # (cls id, freq)
         self.update_cls(cls, score)
+        #define a mean_history list with max length 10
+        self.mean_history = deque(maxlen=3)
+        self.bb_depth = None
 
         self.score = score
         self.tracklet_len = 0
@@ -38,6 +57,63 @@ class STrack(BaseTrack):
             self.update_features(feat)
         self.features = deque([], maxlen=feat_history)
         self.alpha = 0.9
+
+    def get_d1(self):
+        #calculate the depth of the object in the depth image
+        #get the bounding box of the object in the depth image
+        #get the median of the depth values in the bounding box excluding the zeros and the nans
+        #return the depth value
+        if self.state != TrackState.Tracked and self.state != TrackState.New and self.bb_depth is not None:
+            return self.bb_depth
+        bounding_box = copy.deepcopy(self.tlwh)
+        #get the depth of the bounding box in the depth image
+        #clip the bounding box to the image size and remove the negative values
+        bounding_box[bounding_box < 0] = 0
+        bounding_box[np.isnan(bounding_box)] = 0
+        #if any of the bounding values is inf then set it to zero
+        # bounding_box[np.isinf(bounding_box)] = 0
+        track_depth = copy.deepcopy(STrack.current_depth_image)[int(bounding_box[1]):int(bounding_box[1]+bounding_box[3]), int(bounding_box[0]):int(bounding_box[0]+bounding_box[2])]
+        #get the median of the depth values in the bounding box excluding the zeros and the nans
+        track_depth = track_depth[track_depth != 0]
+        track_depth = track_depth[~np.isnan(track_depth)]
+        if len(track_depth) == 0:
+            return 0
+        self.bb_depth = np.median(track_depth)
+        return self.bb_depth
+    
+
+    def update_depth_image(depth_image):
+        #convert depth image type to float32
+        depth_image = depth_image.astype(np.float32)
+        depth_image/=10
+        STrack.current_depth_image = depth_image
+
+    def update_ego_motion(odom, fps_rot, fps_depth):
+        quat = False
+        if quat:
+            quaternion = (odom.pose.pose.orientation.x, odom.pose.pose.orientation.y,
+                    odom.pose.pose.orientation.z, odom.pose.pose.orientation.w)
+            #get the yaw from the quaternion not using the tf library
+            yaw = np.arctan2(2.0 * (quaternion[3] * quaternion[2] + quaternion[0] * quaternion[1]),
+                            1.0 - 2.0 * (quaternion[1] * quaternion[1] + quaternion[2] * quaternion[2]))
+        else:
+            yaw = odom.pose.pose.orientation.z
+        while  abs(yaw-STrack.current_yaw) > np.pi :
+            if yaw < STrack.current_yaw :
+                yaw += 2*np.pi
+            else:
+                yaw -= 2*np.pi
+        twist = odom.twist.twist
+        STrack.current_yaw_dot = twist.angular.z / fps_rot # frames are being published at 20Hz in the simulator
+        STrack.yaw_dot_list.append(STrack.current_yaw_dot)
+        STrack.current_yaw = yaw
+        STrack.current_yaw_dot_filtered = np.mean(STrack.yaw_dot_list)
+        raw_x_dot = twist.linear.x
+        raw_y_dot = twist.linear.y
+        x_dot = raw_x_dot*np.cos(STrack.current_yaw)+raw_y_dot*np.sin(STrack.current_yaw)
+        y_dot = -raw_x_dot*np.sin(STrack.current_yaw)+raw_y_dot*np.cos(STrack.current_yaw)
+        STrack.current_D_dot = x_dot / fps_depth
+        # print("current y_dot is ", y_dot, "   current_x_dot is ", x_dot)
 
     def update_features(self, feat):
         feat /= np.linalg.norm(feat)
@@ -74,7 +150,8 @@ class STrack(BaseTrack):
             mean_state[6] = 0
             mean_state[7] = 0
 
-        self.mean, self.covariance = self.kalman_filter.predict(mean_state, self.covariance)
+        self.mean, self.covariance = self.kalman_filter.predict(mean_state, self.covariance, np.array([STrack.current_yaw_dot]))
+
 
     @staticmethod
     def multi_predict(stracks):
@@ -85,7 +162,9 @@ class STrack(BaseTrack):
                 if st.state != TrackState.Tracked:
                     multi_mean[i][6] = 0
                     multi_mean[i][7] = 0
-            multi_mean, multi_covariance = STrack.shared_kalman.multi_predict(multi_mean, multi_covariance)
+            control_input = np.array([[STrack.current_yaw_dot, STrack.current_D_dot, st.get_d1() ]for st in stracks])
+            multi_mean, multi_covariance = STrack.shared_kalman.multi_predict(multi_mean, multi_covariance, control_input)
+
             for i, (mean, cov) in enumerate(zip(multi_mean, multi_covariance)):
                 stracks[i].mean = mean
                 stracks[i].covariance = cov
@@ -243,7 +322,7 @@ class BoTSORT(object):
                 frame_rate=30,
                 lambda_=0.985
                 ):
-
+        self.last_time_stamp = 0 #time in seconds
         self.tracked_stracks = []  # type: list[STrack]
         self.lost_stracks = []  # type: list[STrack]
         self.removed_stracks = []  # type: list[STrack]
@@ -257,8 +336,12 @@ class BoTSORT(object):
 
         self.buffer_size = int(frame_rate / 30.0 * track_buffer)
         self.max_time_lost = self.buffer_size
-        self.kalman_filter = KalmanFilter()
-
+        self.kalman_filter = KalmanFilter(IMG_WIDTH, IMG_HEIGHT, FOCAL_LENGTH) #TODO check the parameters
+        self.use_depth = True
+        self.use_odometry = True
+        self.time_window_list = deque(maxlen=300)
+        self.time_window_list.append(30)
+        self.last_time = time.time()
         # ReID module
         self.proximity_thresh = proximity_thresh
         self.appearance_thresh = appearance_thresh
@@ -268,7 +351,46 @@ class BoTSORT(object):
 
         self.gmc = GMC(method=cmc_method, verbose=[None,False])
 
-    def update(self, output_results, img):
+    def get_all_track_predictions(self):
+        """
+        Get the predictions of all the active tracks
+        :return: list of bounding boxes of all the active tracks
+        """
+        bboxes = []
+        for track in joint_stracks(self.tracked_stracks, self.lost_stracks):
+            bbox = track.tlwh
+            #append the track id to the bbox
+            bbox = np.append(bbox, track.track_id)
+            bboxes.append(bbox)
+        return bboxes
+    
+    def update_time(self, odom):
+        current_time = odom.header.stamp.to_time()
+        time_now = current_time
+        if time_now - self.last_time_stamp == 0:
+            self.fps = 25
+            self.fps_depth = 25
+            print(f"odom header time stamp at {self.frame_id} is the same as the last time stamp")
+        else:
+            self.fps =  (1.0/(time_now - self.last_time_stamp))*1
+            self.fps_depth = (1.0/(time_now - self.last_time_stamp)) *1 #TODO This is the fps for translational motion (depth) only
+            # print(f'at frame {self.frame_id} fps is {self.fps}')
+
+        self.last_time_stamp = time_now
+        # print("fps: ", self.fps)
+
+    def update(self, output_results, img, depth_image = None, odom = None, masks = None):
+        self.update_time(odom)
+        STrack.update_ego_motion(odom, self.fps, self.fps_depth)
+        STrack.update_depth_image(depth_image)
+        #get the current time and compare it with the last time update was called
+        time_now = time.time()
+        self.time_window_list.append(1.0/(time_now - self.last_time))
+        #print the average and standard deviation of the time window
+        # if self.frame_id % 100 == 0:
+        #     print("Average fps: ", np.mean(self.time_window_list), "Standard deviation: ", np.std(self.time_window_list))
+        # print((self.fps/2 - self.time_window_list[-1]))
+        self.last_time = time_now
         self.frame_id += 1
         activated_starcks = []
         refind_stracks = []
