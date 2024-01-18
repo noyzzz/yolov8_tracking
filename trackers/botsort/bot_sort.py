@@ -579,8 +579,12 @@ class BoTSORT(object):
 
         # output_stracks = [track for track in self.tracked_stracks if track.is_activated]
         output_stracks = [track for track in self.tracked_stracks if track.is_activated]
+        local_lost_stracks = copy.deepcopy(self.lost_stracks)
+        for track in local_lost_stracks:
+            track.cls = -1
         outputs = []
-        for t in output_stracks:
+        test_all_stracks = joint_stracks(self.tracked_stracks, local_lost_stracks)
+        for t in output_stracks :
             output= []
             tlwh = t.tlwh
             tid = t.track_id
