@@ -120,7 +120,6 @@ class KalmanBoxTracker(object):
         #get the median of the depth values in the bounding box excluding the zeros and the nans
         #return the depth value
         bounding_box = copy.deepcopy(self.get_tlwh())
-        print("bounding_box: ", bounding_box)
         #get the depth of the bounding box in the depth image
         #clip the bounding box to the image size and remove the negative values
         bounding_box[bounding_box < 0] = 0
@@ -213,7 +212,11 @@ class KalmanBoxTracker(object):
         if((self.kf.x[6]+self.kf.x[2]) <= 0):
             self.kf.x[6] *= 0.0
         
-        control_input = np.array([KalmanBoxTracker.current_yaw_dot, KalmanBoxTracker.current_D_dot, self.get_d1()])
+        #if KalmanBoxTracker has attributes current_yaw_dot and current_D_dot then use them as control input
+        if hasattr(KalmanBoxTracker, 'current_yaw_dot') and hasattr(KalmanBoxTracker, 'current_D_dot'):
+            control_input = np.array([KalmanBoxTracker.current_yaw_dot, KalmanBoxTracker.current_D_dot, self.get_d1()])
+        else:
+            control_input = None
         self.kf.predict(control_input = control_input)
         self.age += 1
         if(self.time_since_update > 0):
@@ -293,9 +296,10 @@ class OCSort(object):
         Returns the a similar array, where the last column is the object ID.
         NOTE: The number of objects returned may differ from the number of detections provided.
         """
-        self.update_time(odom)
-        KalmanBoxTracker.update_ego_motion(odom, self.fps, self.fps_depth)
-        KalmanBoxTracker.update_depth_image(depth_image)
+        if odom is not None:
+            self.update_time(odom)
+            KalmanBoxTracker.update_ego_motion(odom, self.fps, self.fps_depth)
+            KalmanBoxTracker.update_depth_image(depth_image)
         self.frame_count += 1
         
         xyxys = dets[:, 0:4]
@@ -319,8 +323,6 @@ class OCSort(object):
         trks = np.zeros((len(self.trackers), 5))
         to_del = []
         ret = []
-        control_input = np.array([KalmanBoxTracker.current_yaw_dot, KalmanBoxTracker.current_D_dot])
-        # print("control_input 'ocsort' is : ", control_input)
         for t, trk in enumerate(trks):
             pos = self.trackers[t].predict()[0]
             trk[:] = [pos[0], pos[1], pos[2], pos[3], 0]

@@ -216,11 +216,12 @@ class KalmanFilter(object):
         for i in range(len(mean)):
             this_motion_cov = np.diag(sqr[i])
             this_motion_mat = self.calculate_motion_mat(mean[i])
-            this_control_mat = self.calculate_control_mat(mean[i])
-            mean_rot_applied = np.dot(control_signal[i][0], this_control_mat.T)[0]
-            depth_control_mat = self.calculate_depth_control_mat(mean[i], control_signal[i])
-            mean_trans_applied = np.dot(control_signal[i][1], depth_control_mat.T)[0]
-            if use_control_signal:
+            if control_signal is not None:
+                this_control_mat = self.calculate_control_mat(mean[i])
+                mean_rot_applied = np.dot(control_signal[i][0], this_control_mat.T)[0]
+                depth_control_mat = self.calculate_depth_control_mat(mean[i], control_signal[i])
+                mean_trans_applied = np.dot(control_signal[i][1], depth_control_mat.T)[0]
+            if use_control_signal and control_signal is not None:
                 mean[i] = np.dot(mean[i], this_motion_mat.T) + mean_rot_applied + mean_trans_applied
                 covariance[i] = np.linalg.multi_dot((
                     this_motion_mat, covariance[i], this_motion_mat.T)) + this_motion_cov

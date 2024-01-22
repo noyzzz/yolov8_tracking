@@ -51,7 +51,6 @@ class STrack(BaseTrack):
         if self.state != TrackState.Tracked and self.state != TrackState.New and self.bb_depth is not None:
             return self.bb_depth
         bounding_box = copy.deepcopy(self.tlwh)
-        # print("bounding_box: ", bounding_box)
         #get the depth of the bounding box in the depth image
         #clip the bounding box to the image size and remove the negative values
         bounding_box[bounding_box < 0] = 0

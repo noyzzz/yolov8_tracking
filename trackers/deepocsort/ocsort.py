@@ -348,7 +348,10 @@ class KalmanBoxTracker(object):
                 self.kf.x[6] *= 0.0
             Q = None
 
-        control_input = np.array([KalmanBoxTracker.current_yaw_dot, KalmanBoxTracker.current_D_dot, self.get_d1()])                                            
+        if hasattr(KalmanBoxTracker, 'current_yaw_dot_filtered') and hasattr(KalmanBoxTracker, 'current_D_dot'):
+            control_input = np.array([KalmanBoxTracker.current_yaw_dot, KalmanBoxTracker.current_D_dot, self.get_d1()])   
+        else:
+            control_input = None                                         
         self.kf.predict(Q=Q, control_input=control_input)
         self.age += 1
         if self.time_since_update > 0:
@@ -464,9 +467,10 @@ class OCSort(object):
         NOTE: The number of objects returned may differ from the number of detections provided.
         """
         tag='blub'
-        self.update_time(odom)
-        KalmanBoxTracker.update_ego_motion(odom, self.fps, self.fps_depth)
-        KalmanBoxTracker.update_depth_image(depth_image)
+        if odom is not None:
+            self.update_time(odom)
+            KalmanBoxTracker.update_ego_motion(odom, self.fps, self.fps_depth)
+            KalmanBoxTracker.update_depth_image(depth_image)
         xyxys = dets[:, 0:4]
         scores = dets[:, 4]
         clss = dets[:, 5]

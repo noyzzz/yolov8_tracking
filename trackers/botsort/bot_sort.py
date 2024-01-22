@@ -162,7 +162,10 @@ class STrack(BaseTrack):
                 if st.state != TrackState.Tracked:
                     multi_mean[i][6] = 0
                     multi_mean[i][7] = 0
-            control_input = np.array([[STrack.current_yaw_dot, STrack.current_D_dot, st.get_d1() ]for st in stracks])
+            if hasattr(STrack, 'current_D_dot'):
+                control_input = np.array([[STrack.current_yaw_dot, STrack.current_D_dot, st.get_d1() ]for st in stracks])
+            else:
+                control_input = None
             multi_mean, multi_covariance = STrack.shared_kalman.multi_predict(multi_mean, multi_covariance, control_input)
 
             for i, (mean, cov) in enumerate(zip(multi_mean, multi_covariance)):
@@ -380,9 +383,10 @@ class BoTSORT(object):
         # print("fps: ", self.fps)
 
     def update(self, output_results, img, depth_image = None, odom = None, masks = None):
-        self.update_time(odom)
-        STrack.update_ego_motion(odom, self.fps, self.fps_depth)
-        STrack.update_depth_image(depth_image)
+        if odom is not None:
+            self.update_time(odom)
+            STrack.update_ego_motion(odom, self.fps, self.fps_depth)
+            STrack.update_depth_image(depth_image)
         #get the current time and compare it with the last time update was called
         time_now = time.time()
         self.time_window_list.append(1.0/(time_now - self.last_time))
