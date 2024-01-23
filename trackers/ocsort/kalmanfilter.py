@@ -410,7 +410,7 @@ class KalmanFilterNew(object):
             mean_rot_applied = np.dot(control_input[0], this_control_mat.T)[0]
             depth_control_mat = self.calculate_depth_control_mat(self.x, control_input)
             mean_trans_applied = np.dot(control_input[1], depth_control_mat.T)[0]
-            mean_trans_applied[2] = depth_control_mat[2] * control_input[1] #to get the correct predicted s it should be multiplied with D_dot twice 
+            mean_trans_applied[2] = mean_trans_applied[2] * control_input[1] #to get the correct predicted s it should be multiplied with D_dot twice 
             self.x = dot(F, self.x) + mean_rot_applied[0:7].reshape(7,1) + mean_trans_applied[0:7].reshape(7,1)
             # if np.sum(mean_rot_applied) > 20 or np.sum(mean_trans_applied) > 20:
             # print("mean_rot_applied: ", mean_rot_applied[0])

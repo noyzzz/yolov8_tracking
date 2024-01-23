@@ -357,14 +357,17 @@ class KalmanFilterNew(object):
         w = np.sqrt(mean[2] * mean[3])
         h = mean[2] / w
         bottom_y = mean[1]+h/2.# v1 + mean[3]/2 #bottom right corner y wrt image center
+        right_x = mean[0]+w/2.# u1 + mean[2]/2 #bottom right corner x wrt image center
         u_coeff = u1*np.sqrt(u1**2 + self.focal_length**2)/(self.focal_length * control_signal[2])
         v_coeff = v1*np.sqrt(v1**2 + self.focal_length**2)/(self.focal_length * control_signal[2])
         h_coeff = (bottom_y*np.sqrt(bottom_y**2 + self.focal_length**2) - v1*np.sqrt(v1**2 + self.focal_length**2))\
                    /(self.focal_length * control_signal[2])
+        w_coeff = (right_x*np.sqrt(right_x**2 + self.focal_length**2) - u1*np.sqrt(u1**2 + self.focal_length**2))\
+                     /(self.focal_length * control_signal[2])
         depth_control_mat = np.zeros((8, 1))
         depth_control_mat[0, 0] = u_coeff
         depth_control_mat[1, 0] = v_coeff
-        depth_control_mat[3, 0] = 0#h_coeff FIXME: this is not correct, this is not h_coeff because the state definition here is not x, y, w, h
+        depth_control_mat[2, 0] = w_coeff*h_coeff
         return depth_control_mat
 
     def predict(self, u=None, B=None, F=None, Q=None, control_input=None):
@@ -404,6 +407,8 @@ class KalmanFilterNew(object):
             mean_rot_applied = np.dot(control_input[0], this_control_mat.T)[0]
             depth_control_mat = self.calculate_depth_control_mat(self.x, control_input)
             mean_trans_applied = np.dot(control_input[1], depth_control_mat.T)[0]
+            mean_trans_applied[2] = mean_trans_applied[2] * control_input[1] #to get the correct predicted s it should be multiplied with D_dot twice 
+            assert mean_trans_applied[2] >= 0
             self.x = dot(F, self.x) + mean_rot_applied[0:8].reshape(8,1) + mean_trans_applied[0:8].reshape(8,1)
             # if np.sum(mean_rot_applied) > 20 or np.sum(mean_trans_applied) > 20:
             # print("mean_rot_applied: ", mean_rot_applied[0])
