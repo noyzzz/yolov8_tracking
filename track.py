@@ -356,7 +356,7 @@ def run(
                         output_random = np.random.rand()
                     if len(modified_gt_list) and output_random < 0.6:
                         modified_gt_list = torch.cat(modified_gt_list, dim=0)
-                        modified_gt_list = add_noise2tensor(modified_gt_list, [im0.shape[0], im0.shape[1]], 0.10) 
+                        modified_gt_list = add_noise2tensor(modified_gt_list, [im0.shape[0], im0.shape[1]], 0.02) 
                     else:
                         modified_gt_list = torch.empty((0,6))
                 outputs[i] = None

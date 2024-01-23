@@ -13,7 +13,7 @@
                 "yolov8x.pt",
                 "--img",
                 "320",
-                "--tracking-method",   "botsort",
+                "--tracking-method",   "ocsort",
                 "--show-vid",
                 "--name",       "day_dummy_sc3",
                 "--save-txt",
