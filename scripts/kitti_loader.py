@@ -2,49 +2,36 @@
 from __future__ import print_function
 
 import glob
-import math
 import os
-import time
-from pathlib import Path
-from threading import Thread
-from urllib.parse import urlparse
-
+# from pathlib import Path
+# from threading import Thread
 import cv2
 import numpy as np
-import torch
-from PIL import Image
 
 import sys
 sys.path.append("../")
-from ros_classes import image_converter
-
-import roslib
 import sys
-import rospy
-from std_msgs.msg import String
-from sensor_msgs.msg import Image
-from cv_bridge import CvBridge, CvBridgeError
 from collections import namedtuple
 
-
 from ultralytics.yolo.data.augment import LetterBox
-from ultralytics.yolo.data.utils import IMG_FORMATS, VID_FORMATS
-from ultralytics.yolo.utils import LOGGER, ROOT, is_colab, is_kaggle, ops
-from ultralytics.yolo.utils.checks import check_requirements
-import threading
 import kitti_loader_utils as utils
-class KittiLoader:
-    def __init__(self, kitii_base_path: str, sequence: str, transform = None, 
-                    focalx = 320.0, focaly = 320.0, centerx = 320.0, centery = 240.0):
-            self.base_path = kitii_base_path
-            self.sequence = sequence
 
-            # Find all the data files
-            self._get_file_lists()
-            self._load_calib()
-            self._load_oxts() # it loads all the oxts data for a sequence. not an effiecient way to load oxts data
-            self.transform = transform
-    
+class KittiLoader:
+    def __init__(self, kitii_base_path: str, sequence: str, imgsz=640, stride=32, auto=True, transforms=None):
+        self.base_path = kitii_base_path
+        self.sequence = sequence
+        self.transforms = transforms
+        self.index = 0 
+        self.imtype = 'png'
+        self.imgsz = imgsz
+        self.stride = stride
+        self.auto = auto
+        # Find all the data files
+        self._get_file_lists()
+        self._load_calib()
+        self._load_oxts() # it loads all the oxts data for a sequence. not an effiecient way to load oxts data
+
+
     def _get_file_lists(self):
         """Find and list data files for each sensor."""
         self.cam2_files = sorted(glob.glob(
@@ -118,9 +105,7 @@ class KittiLoader:
     
     
     def _load_oxts(self):
-        """Load OXTS data from file."""
-        self.oxts = utils.load_oxts_packets_and_poses(self.oxts_files)
-        """Generator to read OXTS ground truth data.
+        """Load OXTS data from file.
 
            Poses are given in an East-North-Up coordinate system 
            whose origin is the first GPS position.
@@ -164,14 +149,14 @@ class KittiLoader:
         oxt = self.oxts[index]
 
         # Apply the data transformations
-        if self.transform is not None:
-            cam2 = self.transform(cam2)
+        if self.transforms is not None:
+            cam2 = self.transforms(cam2)
         else:
             cam2 = LetterBox(self.imgsz, self.auto, stride=self.stride)(image=cam2_0)
             cam2 = cam2_0.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
             cam2 = np.ascontiguousarray(cam2_0)  # contiguous
         
-        self.extra_output = { "velodyne": velo, "oxt": oxt, "gt": self.gt} #TODO: add gt
+        self.extra_output = { "velodyne": velo, "oxt": oxt, "gt": None} #TODO: add gt
 
         return self.base_path, cam2, cam2_0, "", self.extra_output
     
@@ -193,4 +178,17 @@ class KittiLoader:
     
 
 if __name__ == "__main__":
-    dataset = KittiLoader("/home/apera/mhmd/kittiMOT/data_kittiMOT/training", "0", transform = None)
+    import time
+    dataset = KittiLoader("/home/apera/mhmd/kittiMOT/data_kittiMOT/training", "0001", transforms = None)
+    for data in dataset:
+        print(data[0])
+        cv2.imshow("image", data[1])
+        print(data[1].shape)
+        print(data[2].shape)
+        print(data[3])
+        print(data[4]["velodyne"].shape)
+        print(data[4]["oxt"].packet)
+        print(data[4]["oxt"].T_w_imu)
+        time.sleep(0.1)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
