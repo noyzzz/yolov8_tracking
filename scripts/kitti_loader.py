@@ -10,7 +10,6 @@ import numpy as np
 
 import sys
 sys.path.append("../")
-import sys
 from collections import namedtuple
 
 from ultralytics.yolo.data.augment import LetterBox
@@ -145,7 +144,13 @@ class KittiLoader:
         """Return the data from a particular index."""
         # Load the data from disk
         cam2_0 = cv2.imread(self.cam2_files[index].strip())
-        velo = np.fromfile(self.velo_files[index].strip(), dtype=np.float32)
+        velo = np.fromfile(self.velo_files[index].strip(), dtype=np.float32).reshape((-1, 4))
+        velo[:, 3] = 1.
+        upsampled_params = {"filtering": 1, "upsample": 1}
+        intr_raw = np.hstack((self.calib.K_cam2, np.zeros((3, 1))))
+        depthmap = utils.generate_depth(velodata=velo, M_velo2cam=self.calib.Tr_velo_cam, 
+                                        width=cam2_0.shape[1], height=cam2_0.shape[0],
+                                        intr_raw=intr_raw, params=upsampled_params)
         oxt = self.oxts[index]
 
         # Apply the data transformations
@@ -156,7 +161,7 @@ class KittiLoader:
             cam2 = cam2_0.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
             cam2 = np.ascontiguousarray(cam2_0)  # contiguous
         
-        self.extra_output = { "velodyne": velo, "oxt": oxt, "gt": None} #TODO: add gt
+        self.extra_output = {"depth": depthmap, "velodyne": velo, "oxt": oxt, "gt": None} #TODO: add gt
 
         return self.base_path, cam2, cam2_0, "", self.extra_output
     
@@ -189,6 +194,7 @@ if __name__ == "__main__":
         print(data[4]["velodyne"].shape)
         print(data[4]["oxt"].packet)
         print(data[4]["oxt"].T_w_imu)
+        print(data[4]["depth"].shape)
         time.sleep(0.1)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
