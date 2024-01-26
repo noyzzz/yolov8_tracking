@@ -70,7 +70,7 @@ class KittiLoader:
         transforms: image transformations
 
 """
-    def __init__(self, kitii_base_path: str, sequence: str, imgsz=640, stride=32, auto=True, transforms=None):
+    def __init__(self, kitii_base_path: str, sequence: str, imgsz=640, stride=32, auto=True, transforms=None, **kwargs):
         self.base_path = kitii_base_path
         self.sequence = sequence
         self.transforms = transforms
@@ -79,6 +79,7 @@ class KittiLoader:
         self.imgsz = imgsz
         self.stride = stride
         self.auto = auto
+        self.kwargs = kwargs
         # Find all the data files
         self._get_file_lists()
         self._load_calib()
@@ -232,29 +233,41 @@ class KittiLoader:
         """Return the data from a particular frame_index."""
         # Load the data from disk
         cam2_0 = cv2.imread(self.cam2_files[frame_index].strip())
+
+        # cam2_0 = cv2.resize(cam2_0, (320, 192))
         velo = np.fromfile(self.velo_files[frame_index].strip(), dtype=np.float32).reshape((-1, 4))
         velo[:, 3] = 1.
         upsampled_params = {"filtering": 1, "upsample": 1}
         intr_raw = np.hstack((self.calib.K_cam2, np.zeros((3, 1))))
-        depthmap = utils.generate_depth(velodata=velo, M_velo2cam=self.calib.Tr_velo_cam, 
-                                        width=cam2_0.shape[1], height=cam2_0.shape[0],
-                                        intr_raw=intr_raw, params=upsampled_params)
+        if self.kwargs.get("depth_image", False):
+            depthmap = utils.generate_depth(velodata=velo, M_velo2cam=self.calib.Tr_velo_cam, 
+                                            width=cam2_0.shape[1], height=cam2_0.shape[0],
+                                            intr_raw=intr_raw, params=upsampled_params)
+        else:
+            depthmap = None
+            
         oxt = self.oxts[frame_index]
         _det_ind = list(range(6,10)) + [-2, -1]
         # Assuming that the frame index starts with 0 in detection file
         dets = self.seq_trks[np.where(self.seq_trks[:,0]==frame_index)][:,_det_ind]
         # Apply the data transformations
         if self.transforms is not None:
-            cam2 = self.transforms(cam2)
+            cam2 = self.transforms(cam2_0)
         else:
             cam2 = LetterBox(self.imgsz, self.auto, stride=self.stride)(image=cam2_0)
-            cam2 = cam2_0.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
-            cam2 = np.ascontiguousarray(cam2_0)  # contiguous
+            cam2 = cam2.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
+            cam2 = np.ascontiguousarray(cam2)  # contiguous
         
-        self.extra_output = {"depth": depthmap, "velodyne": velo, "oxt": oxt, "dets": dets, "gt": None} #TODO: add gt
+        
+        self.extra_output = {"depth_image": depthmap, "velodyne": velo, "oxt": oxt, "dets": dets, "gt": None} #TODO: add gt
 
-        return self.base_path, cam2, cam2_0, "", self.extra_output
+        return self.base_path, cam2, [cam2_0], None, "", self.extra_output
     
+    def __iter__(self):
+        """Return the iterator object."""
+        self.index = 0
+        return self
+
     def __next__(self):
         """Return the next sequence."""
         # Get the data from the next index
