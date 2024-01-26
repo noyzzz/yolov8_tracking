@@ -8,7 +8,7 @@
             "program": "${workspaceFolder}/scripts/track_script.py",
             "args": [
                 "--source",
-                "/home/rosen/mhmd/vslam_ws/data/kittiMOT/testing",
+                "/home/rosen/mhmd/vslam_ws/data/kittiMOT/training",
                 "--yolo-weights",
                 "yolov8x.pt",
                 "--img",
@@ -25,9 +25,7 @@
                 "--classes",
                 "0",
                 "2",
-                "5",
-                "7",
-                "--use-emap", "1",
+                "--use-emap", "0",
 
             ]
         }
