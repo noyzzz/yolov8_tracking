@@ -163,6 +163,8 @@ class KittiLoader:
         Tr_imu_velo = np.reshape(filedata['Tr_imu_velo'], (3, 4))
         data['Tr_imu_velo'] = np.vstack([Tr_imu_velo, [0, 0, 0, 1]])
 
+        data['T_imu_cam'] = data['Tr_velo_cam'].dot(data['Tr_velo_cam'])
+
         # Compute the camera intrinsics
         data['K_cam0'] = P_rect_00[0:3, 0:3]
         data['K_cam1'] = P_rect_10[0:3, 0:3]
@@ -244,7 +246,7 @@ class KittiLoader:
     def _load_gt(self):
         """Load ground truth tracks from file."""
         for seq_file in self.gt_files:
-            cats = ['Pedestrian', 'Car']
+            cats = ['Pedestrian', 'Car', 'Van']
             cat_ids = {cat: i for i, cat in enumerate(cats)}
 
             print("starting seq {}".format(self.sequence))
@@ -294,10 +296,10 @@ class KittiLoader:
         # If we are in training mode, load the ground truth tracks from kitti
         else:
             dets = None
-            _gt_ind = [1] + list(range(5,9))
+            _gt_ind = [1] + list(range(6,10))
             gt_values = self.seq_trks[np.where(self.seq_trks[:,0]==frame_index)][:,_gt_ind]
             gt_keys = ["id", "min_x", "min_y", "max_x", "max_y"]
-            gt = dict(zip(gt_keys, gt_values))
+            gt  = [dict(zip(gt_keys, gt_value)) for gt_value in gt_values]
 
         oxt = self.oxts[frame_index]
 
