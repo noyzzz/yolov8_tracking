@@ -12,6 +12,7 @@ import rospy
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
+from scripts.kitti_loader import KittiLoader
 #add .. to path
 # sys.path.append("/home/rosen/tracking_catkin_ws/src/my_tracker")
 print(sys.path)
@@ -194,6 +195,8 @@ def run(
                 vid_stride=vid_stride
             )
         bs = len(dataset)
+    elif "kitti" in source:
+        dataset = KittiLoader(source, sequence="0000" , imgsz=imgsz, stride=stride, auto=pt, transforms=getattr(model.model, 'transforms', None))
     else:
         dataset = LoadImages(
             source,
@@ -222,8 +225,9 @@ def run(
     curr_frames, prev_frames = [None] * bs, [None] * bs
     for frame_idx, batch in enumerate(dataset):
         #if is ros node 
-        if is_ros:
+        if is_ros or "kitti" in source:
             path, im, im0s, vid_cap, s, extra_output = batch
+    
         else:
             path, im, im0s, vid_cap, s = batch
 
@@ -243,6 +247,8 @@ def run(
             # create a pytorch random tensor with size of 1,3,192,320
             my_tensor = torch.rand(1, 3, 192, 320,device=device)
             #change my_tensor to im
+            #resize im to 192,320
+            # im = torch.nn.functional.interpolate(im, size=(192, 320), mode='bilinear', align_corners=False)
             preds = model(im, augment=augment, visualize=visualize)
             time2 = round(time.time() * 1000)
             # print("inference time", time2 - time1)
@@ -262,8 +268,8 @@ def run(
         # Process detections
         for i, det in enumerate(nms_dets_list):  # detections per image
             seen += 1
-            if webcam:  # bs >= 1
-                p, im0, _ = path[i], im0s[i].copy(), dataset.count
+            if webcam or "kitti" in source:  # bs >= 1
+                p, im0 = path[i], im0s[i].copy()
                 if not is_ros:
                     p = Path(p)  # to Path
                     s += f'{i}: '
@@ -326,7 +332,7 @@ def run(
                 #                 tracker_list[i].model.warmup()
                 #     outputs = [None] * bs
                 depth_image = extra_output["depth_image"]
-                if extra_output["odom"] is not None:
+                if "odom" in extra_output.keys() and  extra_output["odom"] is not None:
                     odom = extra_output["odom"]
                 modified_gt_list = None 
                 if extra_output["gt"] is not None:  
@@ -398,7 +404,7 @@ def run(
                         )
                     
             
-            save_gt = True
+            save_gt = False
             gt_path = str(save_dir / "gt")  # im.txt
             # if gt_path does not exist, create it
             if not os.path.exists(gt_path):
@@ -649,7 +655,7 @@ def main(opt):
     play_bag(int(opt.ros_bag))
     check_requirements(requirements=ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
     ic = ros_init(int(opt.ros_package))
-    opt.source = ic
+    # opt.source = ic
     run(**vars(opt))
 
 
