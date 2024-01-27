@@ -15,20 +15,16 @@ from trackers.emap.basetrack import BaseTrack, TrackState
 import time
 from torch.utils.tensorboard import SummaryWriter
 import datetime
+from ..MATracker import MATracker, MATrack
 
 IMG_WIDTH = 960
 IMG_HEIGHT = 540
 FOCAL_LENGTH = 480.0
 
-class STrack(BaseTrack):
-    current_yaw = 0;
-    current_yaw_dot = 0;
-    current_yaw_dot_filtered = 0;
-    current_depth_image = None
-    yaw_dot_list = deque(maxlen=2)
+class STrack(BaseTrack, MATrack):
     shared_kalman = KalmanFilter(IMG_WIDTH, IMG_HEIGHT, FOCAL_LENGTH) #TODO check the parameters
     def __init__(self, tlwh, score, cls):
-
+        MATrack.__init__(self)
         # wait activate
         self._tlwh = np.asarray(tlwh, dtype=np.float32)
         self.kalman_filter = None
@@ -40,65 +36,11 @@ class STrack(BaseTrack):
         self.cls = cls
         #define a mean_history list with max length 10
         self.mean_history = deque(maxlen=3)
-        self.bb_depth = None
+
+    def get_tlwh(self):
+        return self.tlwh
 
 
-    def get_d1(self):
-        #calculate the depth of the object in the depth image
-        #get the bounding box of the object in the depth image
-        #get the median of the depth values in the bounding box excluding the zeros and the nans
-        #return the depth value
-        if self.state != TrackState.Tracked and self.state != TrackState.New and self.bb_depth is not None:
-            return self.bb_depth
-        bounding_box = copy.deepcopy(self.tlwh)
-        #get the depth of the bounding box in the depth image
-        #clip the bounding box to the image size and remove the negative values
-        bounding_box[bounding_box < 0] = 0
-        bounding_box[np.isnan(bounding_box)] = 0
-        #if any of the bounding values is inf then set it to zero
-        # bounding_box[np.isinf(bounding_box)] = 0
-        track_depth = copy.deepcopy(STrack.current_depth_image)[int(bounding_box[1]):int(bounding_box[1]+bounding_box[3]), int(bounding_box[0]):int(bounding_box[0]+bounding_box[2])]
-        #get the median of the depth values in the bounding box excluding the zeros and the nans
-        track_depth = track_depth[track_depth != 0]
-        track_depth = track_depth[~np.isnan(track_depth)]
-        if len(track_depth) == 0:
-            return 0
-        self.bb_depth = np.median(track_depth)
-        return self.bb_depth
-    
-
-    def update_depth_image(depth_image):
-        #convert depth image type to float32
-        depth_image = depth_image.astype(np.float32)
-        depth_image/=10
-        STrack.current_depth_image = depth_image
-
-    def update_ego_motion(odom, fps_rot, fps_depth):
-        quat = False
-        if quat:
-            quaternion = (odom.pose.pose.orientation.x, odom.pose.pose.orientation.y,
-                    odom.pose.pose.orientation.z, odom.pose.pose.orientation.w)
-            #get the yaw from the quaternion not using the tf library
-            yaw = np.arctan2(2.0 * (quaternion[3] * quaternion[2] + quaternion[0] * quaternion[1]),
-                            1.0 - 2.0 * (quaternion[1] * quaternion[1] + quaternion[2] * quaternion[2]))
-        else:
-            yaw = odom.pose.pose.orientation.z
-        while  abs(yaw-STrack.current_yaw) > np.pi :
-            if yaw < STrack.current_yaw :
-                yaw += 2*np.pi
-            else:
-                yaw -= 2*np.pi
-        twist = odom.twist.twist
-        STrack.current_yaw_dot = twist.angular.z / fps_rot # frames are being published at 20Hz in the simulator
-        STrack.yaw_dot_list.append(STrack.current_yaw_dot)
-        STrack.current_yaw = yaw
-        STrack.current_yaw_dot_filtered = np.mean(STrack.yaw_dot_list)
-        raw_x_dot = twist.linear.x
-        raw_y_dot = twist.linear.y
-        x_dot = raw_x_dot*np.cos(STrack.current_yaw)+raw_y_dot*np.sin(STrack.current_yaw)
-        y_dot = -raw_x_dot*np.sin(STrack.current_yaw)+raw_y_dot*np.cos(STrack.current_yaw)
-        STrack.current_D_dot = x_dot / fps_depth
-        # print("current y_dot is ", y_dot, "   current_x_dot is ", x_dot)
 
     def predict(self):
         mean_state = self.mean.copy()
@@ -243,9 +185,9 @@ class STrack(BaseTrack):
         return 'OT_{}_({}-{})'.format(self.track_id, self.start_frame, self.end_frame)
 
 
-class BYTETracker(object):
-    def __init__(self, track_thresh=0.45, match_thresh=0.8, track_buffer=25, frame_rate=30):
-        self.last_time_stamp = 0 #time in seconds
+class BYTETracker(MATracker):
+    def __init__(self, track_thresh=0.45, match_thresh=0.8, track_buffer=25, frame_rate=30, use_depth=False, use_odometry=False):
+        super().__init__(use_depth, use_odometry)
         self.tracked_stracks = []  # type: list[STrack]
         self.lost_stracks = []  # type: list[STrack]
         self.removed_stracks = []  # type: list[STrack]
@@ -258,8 +200,6 @@ class BYTETracker(object):
         self.buffer_size = int(frame_rate / 30.0 * track_buffer)
         self.max_time_lost = self.buffer_size 
         self.kalman_filter = KalmanFilter(IMG_WIDTH, IMG_HEIGHT, FOCAL_LENGTH) #TODO check the parameters
-        self.use_depth = True
-        self.use_odometry = True
         self.time_window_list = deque(maxlen=300)
         self.time_window_list.append(30)
         self.last_time = time.time()
@@ -279,25 +219,10 @@ class BYTETracker(object):
             bbox = np.append(bbox, track.track_id)
             bboxes.append(bbox)
         return bboxes
-
-    def update_time(self, odom):
-        current_time = odom.header.stamp.to_time()
-        time_now = current_time
-        if time_now - self.last_time_stamp == 0:
-            self.fps = 25
-            self.fps_depth = 25
-            print(f"odom header time stamp at {self.frame_id} is the same as the lasts time stamp")
-        else:
-            self.fps =  (1.0/(time_now - self.last_time_stamp))*1
-            self.fps_depth = (1.0/(time_now - self.last_time_stamp)) *1 #TODO This is the fps for translational motion (depth) only
-            # print(f'at frame {self.frame_id} fps is {self.fps}')
-
-        self.last_time_stamp = time_now
-        # print("fps: ", self.fps)
-
+    
     def update(self, dets, color_image, depth_image = None, odom = None, masks = None):
-        self.update_time(odom)
-        STrack.update_ego_motion(odom, self.fps, self.fps_depth)
+        self.update_time(odom, self.frame_id)
+        STrack.update_ego_motion(odom, self.fps)
         STrack.update_depth_image(depth_image)
         #get the current time and compare it with the last time update was called
         time_now = time.time()
@@ -365,41 +290,6 @@ class BYTETracker(object):
             #         y: {track_print.mean[1]:>5.2f}, y_dot: {track_print.mean[5]:>5.2f}, y_cov: {track_print.covariance[1,1]:>5.2f}\
             #             , current_yaw_dot:   {STrack.current_yaw_dot:>5.2f}")
             # print (f"track id: , {track_print.track_id:>5},  x_dot:  , {100*track_print.mean[4]:>5.2f}, x_cov:  {track_print.covariance[0,0]:>5.2f} , current_yaw_dot:   {100*STrack.current_yaw_dot:>5.2f}", flush=True)
-
-        if self.write_log:
-            #take log from the track means and covariances and visualize them in tensorboard
-            for track in joint_stracks(self.tracked_stracks, self.lost_stracks):
-                track_id = track.track_id
-                mean = track.mean
-                covariance = track.covariance
-                if self.writer:
-                    self.writer.add_scalar(f"loc/Track {track_id} x", mean[0], self.frame_id)
-                    self.writer.add_scalar(f"loc/Track {track_id} y", mean[1], self.frame_id)
-                    self.writer.add_scalar(f"loc/Track {track_id} a", mean[2], self.frame_id)
-                    self.writer.add_scalar(f"loc/Track {track_id} h", mean[3], self.frame_id)
-                    self.writer.add_scalar(f"vel/Track {track_id} x_dot", mean[4], self.frame_id)
-                    self.writer.add_scalar(f"vel/Track {track_id} y_dot", mean[5], self.frame_id)
-                    self.writer.add_scalar(f"vel/Track {track_id} a_dot", mean[6], self.frame_id)
-                    self.writer.add_scalar(f"vel/Track {track_id} h_dot", mean[7], self.frame_id)
-                    self.writer.add_scalar(f"loc_cov/Track {track_id} x_cov", covariance[0,0], self.frame_id)
-                    self.writer.add_scalar(f"loc_cov/Track {track_id} y_cov", covariance[1,1], self.frame_id)
-                    self.writer.add_scalar(f"loc_cov/Track {track_id} a_cov", covariance[2,2], self.frame_id)
-                    self.writer.add_scalar(f"loc_cov/Track {track_id} h_cov", covariance[3,3], self.frame_id)
-                    self.writer.add_scalar(f"vel_cov/Track {track_id} x_dot_cov", covariance[4,4], self.frame_id)
-                    self.writer.add_scalar(f"vel_cov/Track {track_id} y_dot_cov", covariance[5,5], self.frame_id)
-                    self.writer.add_scalar(f"vel_cov/Track {track_id} a_dot_cov", covariance[6,6], self.frame_id)
-                    self.writer.add_scalar(f"vel_cov/Track {track_id} h_dot_cov", covariance[7,7], self.frame_id)
-                    # self.writer.add_scalar("vel/current_yaw_dot/raw", STrack.current_yaw_dot, self.frame_id)
-                    # self.writer.add_scalars('current_yaw_dot', {'raw': STrack.current_yaw_dot,
-                                                                # 'filtered': STrack.current_yaw_dot_filtered}, self.frame_id)
-                    # self.writer.add_scalar(f"vel/current_yaw_dot_filtered", STrack.current_yaw_dot_filtered, self.frame_id)
-                    #flush the writer
-                    self.writer.flush()
-                
-                
-
-
-
 
         # Predict the current location with KF
         STrack.multi_predict(strack_pool)
