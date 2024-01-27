@@ -13,7 +13,7 @@
                 "yolov8x.pt",
                 "--img",
                 "320",
-                "--tracking-method",   "ocsort",
+                "--tracking-method",   "emap",
                 "--show-vid",
                 "--name",       "day_dummy_sc3",
                 "--save-txt",
@@ -26,6 +26,10 @@
                 "0",
                 "2",
                 "--use-emap", "0",
+                "5",
+                "7",
+                "--use-depth", "1",
+                "--use-odometry", "1",
 
             ]
         }

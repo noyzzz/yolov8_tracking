@@ -137,7 +137,8 @@ def run(
         ros_package = 0,
         ros_bag = 1,
         op_mode = "eval"
-        , use_emap = 0
+        , use_odometry = 0
+        , use_depth = 0
 ):
     # OP_MODE = "EVAL" #YOLO or EVAL; EVAL uses the ground truth detections
     is_ros = isinstance(source, image_converter)
@@ -212,7 +213,7 @@ def run(
     # Create as many strong sort instances as there are video sources
     tracker_list = []
     for i in range(bs):
-        tracker = create_tracker(tracking_method, tracking_config, reid_weights, device, half)
+        tracker = create_tracker(tracking_method, tracking_config, reid_weights, device, half, use_depth=use_depth, use_odometry=use_odometry)
         tracker_list.append(tracker, )
         if hasattr(tracker_list[i], 'model'):
             if hasattr(tracker_list[i].model, 'warmup'):
@@ -367,7 +368,7 @@ def run(
                         modified_gt_list = torch.empty((0,6))
                 outputs[i] = None
                 track_pred_tlwhs = None
-                if hasattr(tracker_list[i], "use_depth") and hasattr(tracker_list[i], "use_odometry") and tracker_list[i].use_depth and tracker_list[i].use_odometry and use_emap == 1:
+                if hasattr(tracker_list[i], "use_depth") and hasattr(tracker_list[i], "use_odometry") and tracker_list[i].use_depth and tracker_list[i].use_odometry:
                     if op_mode == "yolo":
                         outputs[i] = tracker_list[i].update(det.cpu(), im0, depth_image, odom, None)
                     elif op_mode == "eval":
@@ -629,7 +630,8 @@ def parse_opt():
     parser.add_argument('--ros-package', type=str, default='0', help='is this running in a ros package')
     parser.add_argument('--ros-bag', type=str, default='0', help='run ros bag')
     parser.add_argument('--op-mode', type=str, default='eval', help='get detection from "yolo" or from "eval" ground truth')
-    parser.add_argument('--use-emap', type=int, default=0, help='use emap for tracking')
+    parser.add_argument('--use-depth', type=int, default=0, help='use emap (depth module) for tracking')
+    parser.add_argument('--use-odometry', type=int, default=0, help='use emap (odometry module) for tracking')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     opt.tracking_config = ROOT / 'trackers' / opt.tracking_method / 'configs' / (opt.tracking_method + '.yaml')
