@@ -8,6 +8,8 @@ from .association import *
 from yolov8.ultralytics.yolo.utils.ops import xywh2xyxy
 from collections import deque
 import copy
+from ..MATracker import MATracker, MATrack
+
 
 
 def k_previous_obs(observations, cur_age, k):
@@ -57,16 +59,12 @@ def speed_direction(bbox1, bbox2):
     return speed / norm
 
 
-class KalmanBoxTracker(object):
+class KalmanBoxTracker(MATrack):
     """
     This class represents the internal state of individual tracked objects observed as bbox.
     """
     count = 0
-    current_yaw = 0;
-    current_yaw_dot = 0;
-    current_yaw_dot_filtered = 0;
-    current_depth_image = None
-    yaw_dot_list = deque(maxlen=2)
+
 
     def __init__(self, bbox, cls, delta_t=3, orig=False):
         """
@@ -102,7 +100,7 @@ class KalmanBoxTracker(object):
         self.age = 0
         self.conf = bbox[-1]
         self.cls = cls
-        self.bb_depth = None
+        
         """
         NOTE: [-1,-1,-1,-1,-1] is a compromising placeholder for non-observation status, the same for the return of 
         function k_previous_obs. It is ugly and I do not like it. But to support generate observation array in a 
@@ -141,7 +139,7 @@ class KalmanBoxTracker(object):
         depth_image/=10
         KalmanBoxTracker.current_depth_image = depth_image
 
-    def update_ego_motion(odom, fps_rot, fps_depth):
+    def update_ego_motion(odom, fps_rot):
         quat = False
         if quat:
             quaternion = (odom.pose.pose.orientation.x, odom.pose.pose.orientation.y,
@@ -165,7 +163,7 @@ class KalmanBoxTracker(object):
         raw_y_dot = twist.linear.y
         x_dot = raw_x_dot*np.cos(KalmanBoxTracker.current_yaw)+raw_y_dot*np.sin(KalmanBoxTracker.current_yaw)
         y_dot = -raw_x_dot*np.sin(KalmanBoxTracker.current_yaw)+raw_y_dot*np.cos(KalmanBoxTracker.current_yaw)
-        KalmanBoxTracker.current_D_dot = x_dot / fps_depth
+        KalmanBoxTracker.current_D_dot = x_dot / fps_rot
 
     def update(self, bbox, cls):
         """
@@ -253,13 +251,13 @@ ASSO_FUNCS = {  "iou": iou_batch,
                 "ct_dist": ct_dist}
 
 
-class OCSort(object):
+class OCSort(MATracker):
     def __init__(self, det_thresh, max_age=30, min_hits=3, 
-        iou_threshold=0.3, delta_t=3, asso_func="iou", inertia=0.2, use_byte=False):
+        iou_threshold=0.3, delta_t=3, asso_func="iou", inertia=0.2, use_byte=False, use_depth=False, use_odometry=False):
         """
         Sets key parameters for SORT
         """
-        self.last_time_stamp = 0 #time in seconds
+        super().__init__(use_odometry=use_odometry, use_depth=use_depth)
         self.max_age = max_age
         self.min_hits = min_hits
         self.iou_threshold = iou_threshold
@@ -271,22 +269,6 @@ class OCSort(object):
         self.inertia = inertia
         self.use_byte = use_byte
         KalmanBoxTracker.count = 0
-        self.use_depth = True
-        self.use_odometry = True
-    def update_time(self, odom):
-        current_time = odom.header.stamp.to_time()
-        time_now = current_time
-        if time_now - self.last_time_stamp == 0:
-            self.fps = 25
-            self.fps_depth = 25
-            print(f"odom header time stamp at {self.frame_count} is the same as the lasts time stamp")
-        else:
-            self.fps =  (1.0/(time_now - self.last_time_stamp))*1
-            self.fps_depth = (1.0/(time_now - self.last_time_stamp)) *1 #TODO This is the fps for translational motion (depth) only
-            # print(f'at frame {self.frame_id} fps is {self.fps}')
-
-        self.last_time_stamp = time_now
-        # print("fps: ", self.fps)
     
     def update(self, dets, _, depth_image = None, odom = None, masks = None):
         """
@@ -296,9 +278,9 @@ class OCSort(object):
         Returns the a similar array, where the last column is the object ID.
         NOTE: The number of objects returned may differ from the number of detections provided.
         """
+        self.update_time(odom)
         if odom is not None:
-            self.update_time(odom)
-            KalmanBoxTracker.update_ego_motion(odom, self.fps, self.fps_depth)
+            KalmanBoxTracker.update_ego_motion(odom, self.fps)
             KalmanBoxTracker.update_depth_image(depth_image)
         self.frame_count += 1
         

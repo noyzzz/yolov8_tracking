@@ -1,6 +1,6 @@
 from trackers.strongsort.utils.parser import get_config
 
-def create_tracker(tracker_type, tracker_config, reid_weights, device, half):
+def create_tracker(tracker_type, tracker_config, reid_weights, device, half, use_depth = True, use_odometry = True):
     try:
         cfg = get_config()
         cfg.merge_from_file(tracker_config)
@@ -35,6 +35,8 @@ def create_tracker(tracker_type, tracker_config, reid_weights, device, half):
             asso_func=cfg.ocsort.asso_func,
             inertia=cfg.ocsort.inertia,
             use_byte=cfg.ocsort.use_byte,
+            use_depth=use_depth,
+            use_odometry=use_odometry,
         )
         return ocsort
     
@@ -44,7 +46,7 @@ def create_tracker(tracker_type, tracker_config, reid_weights, device, half):
             track_thresh=cfg.bytetrack.track_thresh,
             match_thresh=cfg.bytetrack.match_thresh,
             track_buffer=cfg.bytetrack.track_buffer,
-            frame_rate=cfg.bytetrack.frame_rate
+            frame_rate=cfg.bytetrack.frame_rate,
         )
         return bytetracker
     
@@ -54,7 +56,9 @@ def create_tracker(tracker_type, tracker_config, reid_weights, device, half):
             track_thresh=cfg.emap.track_thresh,
             match_thresh=cfg.emap.match_thresh,
             track_buffer=cfg.emap.track_buffer,
-            frame_rate=cfg.emap.frame_rate
+            frame_rate=cfg.emap.frame_rate,
+            use_depth=use_depth,
+            use_odometry=use_odometry,
         )
         return bytetracker
     
@@ -78,7 +82,9 @@ def create_tracker(tracker_type, tracker_config, reid_weights, device, half):
             appearance_thresh=cfg.botsort.appearance_thresh,
             cmc_method =cfg.botsort.cmc_method,
             frame_rate=cfg.botsort.frame_rate,
-            lambda_=cfg.botsort.lambda_
+            lambda_=cfg.botsort.lambda_,
+            use_depth=use_depth,
+            use_odometry=use_odometry
         )
         return botsort
     elif tracker_type == 'deepocsort':
@@ -94,6 +100,8 @@ def create_tracker(tracker_type, tracker_config, reid_weights, device, half):
             delta_t=cfg.deepocsort.delta_t,
             asso_func=cfg.deepocsort.asso_func,
             inertia=cfg.deepocsort.inertia,
+            use_depth=use_depth,
+            use_odometry=use_odometry
         )
         return botsort
     else:

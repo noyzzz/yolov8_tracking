@@ -21,13 +21,14 @@
                 "1",
                 "--ros-bag",
                 "0",
-                "--op-mode", "eval",
+                "--op-mode", "yolo",
                 "--classes",
                 "0",
                 "2",
                 "5",
                 "7",
-                "--use-emap", "1",
+                "--use-depth", "0",
+                "--use-odometry", "0",
 
             ]
         }
