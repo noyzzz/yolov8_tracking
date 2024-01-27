@@ -62,15 +62,18 @@ class KittiLoader:
 
 
     Args:
-        kitii_base_path: path to kittiMOT dataset
-        sequence: sequence number
-        imgsz: image size
-        stride: stride for letterbox
-        auto: auto letterbox
-        transforms: image transformations
+        kitii_base_path (str): e.g. "./kittiMOT/data_kittiMOT/testing"
+        sequence (str): e.g "0001"
+        imgsz (int, optional): _description_. Defaults to 640.
+        stride (int, optional): _description_. Defaults to 32.
+        auto (bool, optional): _description_. Defaults to True.
+        transforms (_type_, optional): _description_. Defaults to None.
+        **kwargs: depth_image: bool, if True, depth image is generated from velodyne data
 
 """
     def __init__(self, kitii_base_path: str, sequence: str, imgsz=640, stride=32, auto=True, transforms=None, **kwargs):
+
+
         self.base_path = kitii_base_path
         self.sequence = sequence
         self.transforms = transforms
@@ -84,7 +87,10 @@ class KittiLoader:
         self._get_file_lists()
         self._load_calib()
         self._load_oxts() # it loads all the oxts data for a sequence. not an effiecient way to load oxts data
-        self._load_dets() # it loads all the det data for a sequence. not an effiecient way to load dets data
+        if "testing" in self.base_path:
+            self._load_dets() # it loads all the det data for a sequence. not an effiecient way to load dets data
+        else:
+            self._load_gt() # it loads all the gt data for a sequence. not an effiecient way to load gt data
 
 
     def _get_file_lists(self):
@@ -110,11 +116,18 @@ class KittiLoader:
                         'oxts',
                          f'{self.sequence}.txt')))
         
-        self.dets_files = sorted(glob.glob(
-            os.path.join(self.base_path,
-                        'permatrack_kitti_test',
-                        f'{self.sequence}.txt')))
+        assert len(self.cam2_files) == len(self.velo_files)
         
+        if "testing" in self.base_path:
+            self.dets_files = sorted(glob.glob(
+                os.path.join(self.base_path,
+                            'permatrack_kitti_test',
+                            f'{self.sequence}.txt')))
+        else:
+            self.gt_files = sorted(glob.glob(
+                os.path.join(self.base_path,
+                            'label_02',
+                            f'{self.sequence}.txt')))
     def _load_calib(self):
         """Load and compute intrinsic and extrinsic calibration parameters."""
         # We'll build the calibration parameters as a dictionary, then
@@ -203,7 +216,7 @@ class KittiLoader:
         self.oxts = oxts
 
     def _load_dets(self):
-        """Load detections from file.
+        """Load detections from file from permatrack detections.
             method is taken from
             https://github.com/noahcao/OC_SORT/blob/7a390a5f35dbbb45df6cd584588c216aea527248/tools/run_ocsort_public.py#L101
 
@@ -218,7 +231,7 @@ class KittiLoader:
             lines = seq_file.readlines()
             line_count = 0 
             for line in lines:
-                print("{}/{}".format(line_count,len(lines)))
+                # print("{}/{}".format(line_count,len(lines)))
                 line_count+=1
                 line = line.strip()
                 tmps = line.strip().split()
@@ -227,7 +240,31 @@ class KittiLoader:
                 trk = np.expand_dims(trk, axis=0)
                 seq_trks = np.concatenate([seq_trks, trk], axis=0)
         self.seq_trks = seq_trks
-                
+    
+    def _load_gt(self):
+        """Load ground truth tracks from file."""
+        for seq_file in self.gt_files:
+            cats = ['Pedestrian', 'Car']
+            cat_ids = {cat: i for i, cat in enumerate(cats)}
+
+            print("starting seq {}".format(self.sequence))
+            seq_trks = np.empty((0, 17))
+            seq_file = open(seq_file)
+            lines = seq_file.readlines()
+            line_count = 0 
+            for line in lines:
+                # print("{}/{}".format(line_count,len(lines)))
+                line_count+=1
+                line = line.strip()
+                tmps = line.strip().split()
+                if tmps[2] not in cats:
+                    continue
+                tmps[2] = cat_ids[tmps[2]]
+                trk = np.array([float(d) for d in tmps])
+                trk = np.expand_dims(trk, axis=0)
+                seq_trks = np.concatenate([seq_trks, trk], axis=0)
+        self.seq_trks = seq_trks
+
             
     def __getitem__(self, frame_index):
         """Return the data from a particular frame_index."""
@@ -245,12 +282,25 @@ class KittiLoader:
                                             intr_raw=intr_raw, params=upsampled_params)
         else:
             depthmap = None
-            
+
+        # If we are in testing mode, load the detections from permatacks
+        if "testing" in self.base_path:
+            _det_ind = list(range(6,10)) + [-2, -1]
+            # Assuming that the frame index starts with 0 in detection file
+            dets = self.seq_trks[np.where(self.seq_trks[:,0]==frame_index)][:,_det_ind]
+            # Apply the data transformations
+            gt = None
+
+        # If we are in training mode, load the ground truth tracks from kitti
+        else:
+            dets = None
+            _gt_ind = [1] + list(range(5,9))
+            gt_values = self.seq_trks[np.where(self.seq_trks[:,0]==frame_index)][:,_gt_ind]
+            gt_keys = ["id", "min_x", "min_y", "max_x", "max_y"]
+            gt = dict(zip(gt_keys, gt_values))
+
         oxt = self.oxts[frame_index]
-        _det_ind = list(range(6,10)) + [-2, -1]
-        # Assuming that the frame index starts with 0 in detection file
-        dets = self.seq_trks[np.where(self.seq_trks[:,0]==frame_index)][:,_det_ind]
-        # Apply the data transformations
+
         if self.transforms is not None:
             cam2 = self.transforms(cam2_0)
         else:
@@ -259,7 +309,7 @@ class KittiLoader:
             cam2 = np.ascontiguousarray(cam2)  # contiguous
         
         
-        self.extra_output = {"depth_image": depthmap, "velodyne": velo, "oxt": oxt, "dets": dets, "gt": None} #TODO: add gt
+        self.extra_output = {"depth_image": depthmap, "velodyne": velo, "oxt": oxt, "dets": dets, "gt": gt} #TODO: add gt
 
         return self.base_path, cam2, [cam2_0], None, "", self.extra_output
     
@@ -287,20 +337,26 @@ class KittiLoader:
 
 if __name__ == "__main__":
     import time
-    dataset = KittiLoader("/home/apera/mhmd/kittiMOT/data_kittiMOT/testing", "0001", transforms = None)
-    print(len(dataset))
-    print(dataset[-1])
-    for data in dataset:
-        print(data[0])
-        cv2.imshow("image", data[1])
-        print(data[1].shape)
-        print(data[2].shape)
-        print(data[3])
-        print(data[4]["velodyne"].shape)
-        print(data[4]["oxt"].packet)
-        print(data[4]["oxt"].T_w_imu)
-        print(data[4]["depth"].shape)
-        print(data[4]["dets"])
-        # time.sleep(0.1)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+    for i in range(21):
+        sequence = str(i).zfill(4)
+        try:
+            dataset = KittiLoader("/home/apera/mhmd/kittiMOT/data_kittiMOT/training", sequence, transforms = None, depth_image=False)
+            # print(len(dataset))
+            # print(dataset[-1])
+            for data in dataset:
+                # print(data[0])
+                cv2.imshow("image", data[2][0])
+                # print(data[1].shape)
+                # print(data[2][0].shape)
+                # print(data[3])
+                # print(data[5]["velodyne"].shape)
+                # print(data[5]["oxt"].packet)
+                # # print(data[5]["depth_image"].shape)
+                # print(data[5]["dets"])
+                # print(data[5]["gt"])
+                # # time.sleep(0.1)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+        except:
+            print("error in sequence {}".format(sequence))
+            continue
