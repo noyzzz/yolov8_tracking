@@ -330,8 +330,8 @@ class BYTETracker(MATracker):
 
         for it in u_track:
             track = r_tracked_stracks[it]
-            if len(track.mean_history) > 0:
-                track.update_dummy()
+            # if len(track.mean_history) > 0:
+            #     track.update_dummy()
             if not track.state == TrackState.Lost:
                 track.mark_lost()
                 lost_stracks.append(track)
