@@ -282,6 +282,11 @@ class KittiLoader:
             depthmap = utils.generate_depth(velodata=velo, M_velo2cam=self.calib.Tr_velo_cam, 
                                             width=cam2_0.shape[1], height=cam2_0.shape[0],
                                             intr_raw=intr_raw, params=upsampled_params)
+            # depthmap = depthmap / np.max(depthmap)
+            # depthmap = utils.bilinear_interpolation(depthmap, width=cam2_0.shape[1], height=cam2_0.shape[0])
+            # depthmap = utils.approx_depth(velodata=velo, M_velo2cam=self.calib.Tr_velo_cam,
+            #                                 width=cam2_0.shape[1], height=cam2_0.shape[0],
+            #                                 intr_raw=intr_raw)
         else:
             depthmap = None
 
@@ -339,26 +344,45 @@ class KittiLoader:
 
 if __name__ == "__main__":
     import time
-    for i in range(21):
-        sequence = str(i).zfill(4)
-        try:
-            dataset = KittiLoader("/home/apera/mhmd/kittiMOT/data_kittiMOT/training", sequence, transforms = None, depth_image=False)
-            # print(len(dataset))
-            # print(dataset[-1])
-            for data in dataset:
-                # print(data[0])
-                cv2.imshow("image", data[2][0])
-                # print(data[1].shape)
-                # print(data[2][0].shape)
-                # print(data[3])
-                # print(data[5]["velodyne"].shape)
-                # print(data[5]["oxt"].packet)
-                # # print(data[5]["depth_image"].shape)
-                # print(data[5]["dets"])
-                # print(data[5]["gt"])
-                # # time.sleep(0.1)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
-        except:
-            print("error in sequence {}".format(sequence))
-            continue
+    # for i in range(21):
+    #     sequence = str(i).zfill(4)
+    #     try:
+    #         dataset = KittiLoader("/home/rosen/mhmd/vslam_ws/data/kittiMOT/training", sequence, transforms = None, depth_image=False)
+    #         # print(len(dataset))
+    #         # print(dataset[-1])
+    #         for data in dataset:
+    #             # print(data[0])
+    #             # cv2.imshow("image", data[2][0])
+    #             cv2.imshow("depth", data[5]["depth_image"])
+    #             # print(data[1].shape)
+    #             # print(data[2][0].shape)
+    #             # print(data[3])
+    #             # print(data[5]["velodyne"].shape)
+    #             # print(data[5]["oxt"].packet)
+    #             # # print(data[5]["depth_image"].shape)
+    #             # print(data[5]["dets"])
+    #             # print(data[5]["gt"])
+    #             # # time.sleep(0.1)
+    #             if cv2.waitKey(1) & 0xFF == ord('q'):
+    #                 break
+    #     except:
+    #         print("error in sequence {}".format(sequence))
+    #         continue
+
+    dataset = KittiLoader("/home/rosen/mhmd/vslam_ws/data/kittiMOT/training", "0000", transforms = None, depth_image=True)
+    # print(len(dataset))
+    # print(dataset[-1])
+    data = dataset[0]
+    # print(data[0])
+    # cv2.imshow("image", data[2][0])
+    cv2.imshow("depth", data[5]["depth_image"])
+    # print(data[1].shape)
+    # print(data[2][0].shape)
+    # print(data[3])
+    # print(data[5]["velodyne"].shape)
+    # print(data[5]["oxt"].packet)
+    # # print(data[5]["depth_image"].shape)
+    # print(data[5]["dets"])
+    # print(data[5]["gt"])
+    # # time.sleep(0.1)
+    cv2.waitKey(0)

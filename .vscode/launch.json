@@ -13,7 +13,7 @@
                 "yolov8x.pt",
                 "--img",
                 "320",
-                "--tracking-method",   "emap",
+                "--tracking-method",   "ocsort",
                 "--show-vid",
                 "--name",       "day_dummy_sc3",
                 "--save-txt",
@@ -25,13 +25,16 @@
                 "--classes",
                 "0",
                 "2",
-                "--use-emap", "0",
-                "5",
-                "7",
-                "--use-depth", "1",
-                "--use-odometry", "1",
+                "--use-depth", "0",
+                "--use-odometry", "0",
 
             ]
+        },
+        {
+            "name": "Debug kitti_tests.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/test_script.py"
         }
     ]
 }

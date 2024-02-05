@@ -14,6 +14,9 @@ class MATracker (ABC):
 
 
     def update_time(self, odom, frame_count):
+        if type(odom) is dict and odom["header"] == "kitti":
+            self.fps = 9.6
+            return
         if odom is None:
             self.fps = 25
             return
@@ -56,15 +59,35 @@ class MATrack (ABC):
         if len(track_depth) == 0:
             return 0
         self.bb_depth = np.median(track_depth)
+        if self.bb_depth < 0:
+            raise Exception("bb_depth is negative")
         return self.bb_depth
 
     def update_depth_image(depth_image):
+        if type(depth_image) is dict and depth_image["header"] == "kitti":
+            this_depth_image = depth_image["depth_image"]
+            MATrack.current_depth_image = this_depth_image
+            return
         #convert depth image type to float32
         depth_image = depth_image.astype(np.float32)
         depth_image/=10
         MATrack.current_depth_image = depth_image
 
     def update_ego_motion(odom, fps_rot):
+        #if odom is a dictionary and odom["header"] is "kitti" then
+        if type(odom) is dict and odom["header"] == "kitti":
+            t_imu_cam = odom["t_imu_cam"]
+            oxt_packet = odom["oxts"]
+            v_imu = np.array([[oxt_packet.vf], [oxt_packet.vl], [oxt_packet.vu], [1]])
+            t_cam_imu = np.vstack((np.hstack((t_imu_cam[0:3,0:3].T, np.dot(-t_imu_cam[0:3,0:3].T, t_imu_cam[0:3,3].T).reshape(3,1))), [0,0,0,1]))
+            v_cam = np.dot(t_cam_imu, v_imu)
+            current_z_velocity_cam = v_cam[2, 0]
+            current_yaw_dot = oxt_packet.wu / fps_rot
+            MATrack.current_yaw_dot = current_yaw_dot
+            MATrack.yaw_dot_list.append(MATrack.current_yaw_dot)
+            MATrack.current_yaw_dot_filtered = np.mean(MATrack.yaw_dot_list)
+            MATrack.current_D_dot = current_z_velocity_cam / fps_rot
+            return
         quat = False
         if quat:
             quaternion = (odom.pose.pose.orientation.x, odom.pose.pose.orientation.y,

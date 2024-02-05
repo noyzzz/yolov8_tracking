@@ -354,8 +354,8 @@ class KalmanFilterNew(object):
         v1 = mean[1] - self.image_height/2
         w = np.sqrt(mean[2] * mean[3])
         h = mean[2] / w
-        bottom_y = mean[1]+h/2.# v1 + mean[3]/2 #bottom right corner y wrt image center
-        right_x = mean[0]+w/2.# u1 + mean[2]/2 #bottom right corner x wrt image center
+        bottom_y = v1+h/2.# v1 + mean[3]/2 #bottom right corner y wrt image center
+        right_x = u1+w/2.# u1 + mean[2]/2 #bottom right corner x wrt image center
         u_coeff = u1*np.sqrt(u1**2 + self.focal_length**2)/(self.focal_length * control_signal[2])
         v_coeff = v1*np.sqrt(v1**2 + self.focal_length**2)/(self.focal_length * control_signal[2])
         h_coeff = (bottom_y*np.sqrt(bottom_y**2 + self.focal_length**2) - v1*np.sqrt(v1**2 + self.focal_length**2))\

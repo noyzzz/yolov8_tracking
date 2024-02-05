@@ -2,6 +2,7 @@ import numpy as np
 from collections import namedtuple
 import cv2
 import sys
+import time
 
 def rotx(t):
     """Rotation about the x-axis."""
@@ -187,6 +188,95 @@ def generate_depth(velodata, intr_raw, M_velo2cam, width, height, params):
     return dmap_cleaned
 
 
+def bilinear_interpolation(observed_values, height, width):
+    # Create an empty array to store the recovered image
+    recovered_image = np.zeros((height, width))
+
+    # Iterate over each pixel in the observed values
+    # for i in range(int(height/2)-50, height):
+    for i in range(height):
+        for j in range(width):
+            # If the pixel is observed, copy its value to the recovered image
+            if observed_values[i, j] != 0:
+                recovered_image[i, j] = observed_values[i, j]
+            else:
+                # Perform bilinear interpolation for the missing pixels
+                # Find the nearest observed pixels
+                count = 0
+                sum = 0
+                kernel = 1
+                while count == 0 and kernel < 5:
+                    us, vs = np.meshgrid(range(i-kernel,i+1+kernel), range(j-kernel,j+1+kernel))
+                    for u,v in zip(us.flatten(), vs.flatten()):
+                        if u >= 0 and u < height and v >= 0 and v < width and observed_values[u, v] != 0 and (u, v) != (i, j):
+                            # Use the value of the nearest pixel to fill in the missing pixel
+                            sum += (observed_values[u, v]  / kernel)
+                            count += 1
+                    if count > 0:
+                        recovered_image[i, j] = sum / count
+                    else:
+                        kernel += 1
+
+    return recovered_image
+
+def approx_depth(velodata, intr_raw, M_velo2cam, width, height, points_count_threshold=1, initial_kernel=3, max_kernel=4):
+    total_weighted_value = 0
+    total_weight = 0
+    points_count = 0
+
+    velodata_cam = (M_velo2cam @ velodata.T).T
+
+    # Remove points behind camera
+    valid_indices = velodata_cam[:, 2] >= 0.1
+    velodata_cam = velodata_cam[valid_indices]
+
+    # Project and Generate Pixels
+    velodata_cam_proj = (intr_raw @ velodata_cam.T).T
+    velodata_cam_proj[:, 0] /= velodata_cam_proj[:, 2]
+    velodata_cam_proj[:, 1] /= velodata_cam_proj[:, 2]
+
+    depth = np.sqrt(velodata_cam[:, 1]**2 + velodata_cam[:, 1]**2 + velodata_cam[:, 2]**2)
+    depth = depth / np.max(depth)
+    sampled_points = np.hstack((velodata_cam_proj[:, :2], depth.reshape(-1, 1))) # N * (x, y, depth)
+    # delete the points with x value less than 0 or greater than width+5
+    sampled_points = sampled_points[(sampled_points[:, 0] >= -max_kernel) & (sampled_points[:, 0] < width+max_kernel)]
+    # delete the points with y value less than 0 or greater than height+5
+    sampled_points = sampled_points[(sampled_points[:, 1] >= -max_kernel) & (sampled_points[:, 1] < height+max_kernel)]
+    
+    reconstructed_image = np.zeros((height, width), dtype=np.float32)
+    t1 = time.time()
+    for y in range(int(height/2), height):
+        for x in range(width):
+            kernel = initial_kernel
+            total_weighted_value = 0
+            total_weight = 0
+            points_count = 0
+            while points_count < points_count_threshold and kernel < max_kernel:
+                indices = np.where(np.linalg.norm(sampled_points[:, :2] - np.array([x, y]), axis=1) < kernel)
+                neighbor_coords = sampled_points[indices][:, :2]
+                neighbor_values = sampled_points[indices][:, 2]
+                points_count = neighbor_coords.shape[0]
+                kernel += 1
+
+            if points_count == 0:
+                pixel_value = 0
+
+            else:
+                neighbor_points = np.hstack((neighbor_coords, neighbor_values.reshape(-1, 1)))
+                for (sx, sy, value) in neighbor_points:
+                    distance = np.sqrt((x - sx) ** 2 + (y - sy) ** 2)
+                    # if distance < 1e-2:
+                    #     pixel_value = value  # Exact match, no need for interpolation
+                    #     raise RuntimeError
+                    weight = 1 / distance
+                    total_weighted_value += weight * value
+                    total_weight += weight
+                pixel_value = total_weighted_value / total_weight
+
+            reconstructed_image[y, x] = pixel_value
+    print("Time taken: ", time.time() - t1)
+    return reconstructed_image
+
 
 OxtsData = namedtuple('OxtsData', 'packet, T_w_imu')
 
@@ -199,3 +289,65 @@ OxtsPacket = namedtuple('OxtsPacket',
                         'pos_accuracy, vel_accuracy, ' +
                         'navstat, numsats, ' +
                         'posmode, velmode, orimode')
+
+if __name__ == "__main__":
+
+
+    # Load the image
+    np.random.seed(0)
+    im = cv2.imread("runs/sample.jpg", cv2.IMREAD_GRAYSCALE)
+    # resizes the image to 128, 384
+    im = cv2.resize(im, (300, 256))
+
+    im = im.astype(np.float32)/255
+    observed_fraction = 0.10
+    height, width = im.shape
+    sampled_mask = np.random.choice([0, 1], size=im.shape, p=[1 - observed_fraction, observed_fraction])
+    # cpmpute the indices of the observed pixels
+    sampled_points = np.argwhere(sampled_mask.T == 1)
+    observed_values = im * sampled_mask
+    reconstructed_image = np.zeros((height, width), dtype=np.float32)
+    for y in range(height):
+        for x in range(width):
+            if sampled_mask[y, x] == 1:
+                reconstructed_image[y, x] = observed_values[y, x]
+            else:
+                kernel = 2
+                total_weighted_value = 0
+                total_weight = 0
+                points_count = 0
+                while points_count < 3 and kernel < 4:
+                    indices = np.where(np.linalg.norm(sampled_points - np.array([x, y]),axis=1) < kernel)
+                    neighbor_coords = sampled_points[indices]
+                    neighbor_values = np.array([im[j,i] for (i,j) in neighbor_coords])
+                    points_count = len(indices[0])
+                    kernel += 1
+
+                if points_count == 0:
+                    pixel_value = 0
+
+                else:
+                    neighbor_points = np.hstack((neighbor_coords, neighbor_values.reshape(-1, 1)))
+                    for (sx, sy, value) in neighbor_points:
+                        distance = np.sqrt((x - sx) ** 2 + (y - sy) ** 2)
+                        if distance < 1e-2:
+                            pixel_value =  value # Exact match, no need for interpolation
+                            break
+                        weight = 1 / distance
+                        total_weighted_value += weight * value
+                        total_weight += weight
+                    pixel_value = total_weighted_value / total_weight
+
+                reconstructed_image[y, x] = pixel_value
+
+    # Perform bilinear interpolation to recover the image
+    # recovered_image = bilinear_interpolation(observed_values, width=image_size[0], height=image_size[1])
+
+    # Display the original and recovered images using cv2.imshow
+    cv2.imshow('Observed Pixels', observed_values)
+    # cv2.imshow('Recovered Image', recovered_image.astype(np.uint8))
+    cv2.imshow('Recovered Image', reconstructed_image)
+
+    # Wait for a key press and close the windows
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
