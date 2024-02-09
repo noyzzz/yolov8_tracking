@@ -5,6 +5,9 @@ import copy
 
 
 class MATracker (ABC):
+    IMG_WIDTH = 1242
+    IMG_HEIGHT = 375
+    FOCAL_LENGTH = 721.54
 
     def __init__(self, use_depth, use_odometry):
         self.last_time_stamp = 0 #time in secons

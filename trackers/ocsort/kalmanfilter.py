@@ -104,6 +104,7 @@ from numpy import dot, zeros, eye, isscalar, shape
 import numpy.linalg as linalg
 from filterpy.stats import logpdf
 from filterpy.common import pretty_str, reshape_z
+from ..MATracker import MATracker, MATrack
 
 
 class KalmanFilterNew(object):
@@ -334,9 +335,9 @@ class KalmanFilterNew(object):
 
         self.attr_saved = None
         self.observed = False 
-        IMG_WIDTH = 960
-        IMG_HEIGHT = 540
-        FOCAL_LENGTH = 480.0
+        IMG_WIDTH = MATracker.IMG_WIDTH
+        IMG_HEIGHT = MATracker.IMG_HEIGHT
+        FOCAL_LENGTH = MATracker.FOCAL_LENGTH
         self.image_width, self.image_height, self.focal_length = IMG_WIDTH, IMG_HEIGHT, FOCAL_LENGTH
         self.dt = 1
         self.control_mat = np.zeros((7, 1))
