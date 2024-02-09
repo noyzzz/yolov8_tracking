@@ -7,9 +7,12 @@ import os
 # from threading import Thread
 import cv2
 import numpy as np
-
 import sys
 sys.path.append("../")
+import time
+
+from extern.build import depth_utils
+
 from collections import namedtuple
 
 from ultralytics.yolo.data.augment import LetterBox
@@ -279,14 +282,15 @@ class KittiLoader:
         upsampled_params = {"filtering": 1, "upsample": 1}
         intr_raw = np.hstack((self.calib.K_cam2, np.zeros((3, 1))))
         if self.kwargs.get("depth_image", False):
-            depthmap = utils.generate_depth(velodata=velo, M_velo2cam=self.calib.Tr_velo_cam, 
-                                            width=cam2_0.shape[1], height=cam2_0.shape[0],
-                                            intr_raw=intr_raw, params=upsampled_params)
+            # depthmap = utils.generate_depth(velodata=velo, M_velo2cam=self.calib.Tr_velo_cam, 
+            #                                 width=cam2_0.shape[1], height=cam2_0.shape[0],
+            #                                 intr_raw=intr_raw, params=upsampled_params)
             # depthmap = depthmap / np.max(depthmap)
             # depthmap = utils.bilinear_interpolation(depthmap, width=cam2_0.shape[1], height=cam2_0.shape[0])
-            # depthmap = utils.approx_depth(velodata=velo, M_velo2cam=self.calib.Tr_velo_cam,
-            #                                 width=cam2_0.shape[1], height=cam2_0.shape[0],
-            #                                 intr_raw=intr_raw)
+
+            depthmap = utils.my_approx_depth(velodata=velo, M_velo2cam=self.calib.Tr_velo_cam,
+                                            width=cam2_0.shape[1], height=cam2_0.shape[0],
+                                            intr_raw=intr_raw, max_kernel=0.5)
         else:
             depthmap = None
 

@@ -1,3 +1,7 @@
 [submodule "yolov8"]
 	path = yolov8
 	url = https://github.com/ultralytics/ultralytics
+[submodule "extern/pybind11"]
+	path = extern/pybind11
+	url = https://github.com/pybind/pybind11.git
+	branch = stable

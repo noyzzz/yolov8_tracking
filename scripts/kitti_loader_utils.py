@@ -2,7 +2,9 @@ import numpy as np
 from collections import namedtuple
 import cv2
 import sys
+sys.path.append("../")
 import time
+from extern.build import depth_utils
 
 def rotx(t):
     """Rotation about the x-axis."""
@@ -219,6 +221,54 @@ def bilinear_interpolation(observed_values, height, width):
 
     return recovered_image
 
+
+def my_approx_depth(velodata, intr_raw, M_velo2cam, width, height, points_count_threshold=1, initial_kernel=3, max_kernel=2):
+    total_weighted_value = 0
+    total_weight = 0
+    points_count = 0
+
+    velodata_cam = (M_velo2cam @ velodata.T).T
+
+    # Remove points behind camera
+    valid_indices = velodata_cam[:, 2] >= 0.1
+    velodata_cam = velodata_cam[valid_indices]
+
+    # Project and Generate Pixels
+    velodata_cam_proj = (intr_raw @ velodata_cam.T).T
+    velodata_cam_proj[:, 0] /= velodata_cam_proj[:, 2]
+    velodata_cam_proj[:, 1] /= velodata_cam_proj[:, 2]
+
+    depth = np.sqrt(velodata_cam[:, 1]**2 + velodata_cam[:, 1]**2 + velodata_cam[:, 2]**2)
+    max_depth = np.max(depth)
+    depth = depth / np.max(depth)
+
+    sampled_points = np.hstack((velodata_cam_proj[:, :2], depth.reshape(-1, 1))) # N * (x, y, depth)
+    sampled_points = np.array(sampled_points, dtype=np.float32)
+    # delete the points with x value less than 0 or greater than width+5
+
+    sampled_points = sampled_points[(sampled_points[:, 0] >= -max_kernel) & (sampled_points[:, 0] < width+max_kernel)]
+    # delete the points with y value less than 0 or greater than height+5
+    sampled_points = sampled_points[(sampled_points[:, 1] >= -max_kernel) & (sampled_points[:, 1] < height+max_kernel)]
+    #convert sample points to numpy.ndarray[numpy.float32]
+    t1 = time.time()
+    depth_map = depth_utils.depth_cloud2depth_map_wrapper(sampled_points, width, height, max_kernel);
+    # print("Time taken: ", time.time() - t1)
+    #i have a type example.Point which requires 3 float values as arguments
+    #convert sampled_points to a list of example.Point
+
+    # cpp_sampled_points = [depth_utils.Point(x, y, z) for x, y, z in sampled_points]
+
+    # print("length of sampled_points: ", len(cpp_sampled_points))
+    # depth_map_kiri = depth_utils.depth_cloud2depth_map(cpp_sampled_points, width, height, max_kernel)
+    # depth_map_kiri = np.array(depth_map_kiri)
+
+    #rotate the depth_map by 90 degrees
+    depth_map = np.rot90(depth_map, 3)
+    #compare depth_map and depth_map_kiri elementwise and tell me if they are equal
+    #flip the depth_map horizontally
+    depth_map = np.fliplr(depth_map)
+    return np.array(depth_map)*max_depth
+
 def approx_depth(velodata, intr_raw, M_velo2cam, width, height, points_count_threshold=1, initial_kernel=3, max_kernel=4):
     total_weighted_value = 0
     total_weight = 0
@@ -274,7 +324,7 @@ def approx_depth(velodata, intr_raw, M_velo2cam, width, height, points_count_thr
                 pixel_value = total_weighted_value / total_weight
 
             reconstructed_image[y, x] = pixel_value
-    print("Time taken: ", time.time() - t1)
+    # print("Time taken: ", time.time() - t1)
     return reconstructed_image
 
 
