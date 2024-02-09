@@ -173,6 +173,7 @@ def run(
     op_mode="eval",
     use_odometry=0,
     use_depth=0,
+    kitti_seq = "0005",
 ):
     # OP_MODE = "EVAL" #YOLO or EVAL; EVAL uses the ground truth detections
     is_ros = isinstance(source, image_converter)
@@ -248,12 +249,12 @@ def run(
     elif "kitti" in source:
         dataset = KittiLoader(
             source,
-            sequence="0007",
+            sequence=kitti_seq,
             imgsz=imgsz,
             stride=stride,
             auto=pt,
             transforms=getattr(model.model, "transforms", None),
-            depth_image=False,
+            depth_image=True if use_depth else False,
         )
     else:
         dataset = LoadImages(
@@ -943,6 +944,12 @@ def parse_opt():
         type=int,
         default=0,
         help="use emap (odometry module) for tracking",
+    )
+    parser.add_argument(
+        "--kitti-seq",
+        type=str,
+        default="0005",
+        help="kitti sequence to use for tracking",
     )
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
