@@ -85,6 +85,60 @@ from yolov8.ultralytics.yolo.utils.plotting import Annotator, colors, save_one_b
 from trackers.multi_tracker_zoo import create_tracker
 from ros_classes import image_converter
 
+def parse_line(line):
+    # Split the line by spaces
+    values = line.split()
+    # Extract the relevant values and convert them to floats
+    x1, y1, x2, y2, conf = map(float, values[6:11])
+    cls_conf = float(values[-1])
+    extracted_values = [x1, y1, x2, y2, conf, cls_conf]
+    # Convert the list to a PyTorch tensor
+    tensor = torch.tensor(extracted_values)
+    return tensor
+
+# Function to read the detection file and get a list of tensors
+def read_detection_file(seq_num):
+    file_path = f"./kitti_seqs/{seq_num}.txt"
+    tensors = []
+    with open(file_path, 'r') as file:
+        for line in file:
+            tensor = parse_line(line)
+            tensors.append(tensor)
+        # Convert the list of tensors to a PyTorch tensor
+        tensors = torch.stack(tensors)
+    return tensors
+
+def get_frame2det(seq_num):
+    #parse the detections and return it in form of a dictionary of frame number and the detections (each detection with 6 values containing the x1, y1, x2, y2, conf, cls_conf)
+    file_path = f"./kitti_seqs/{seq_num}.txt"
+    detections = dict()
+    with open(file_path, 'r') as file:
+        for line in file:
+            values = line.split()
+            frame_num = int(values[0])
+            x1, y1, x2, y2, conf = map(float, values[6:11])
+            cls_conf = float(values[-1])
+            class_str = values[2]
+            class_to_int = {"Pedestrian": 0, "Car": 2, "Cyclist": 1, "Truck": 3, "Van": 4, "Person_sitting": 5, "Tram": 6, "Misc": 7, "DontCare": 8}
+
+            class_int = class_to_int[class_str]
+            if class_int !=0 and class_int != 2:
+                continue
+            detection = [x1, y1, x2, y2, 1, class_int]
+            if frame_num in detections.keys():
+                detections[frame_num].append(detection)
+            else:
+                detections[frame_num] = [detection]
+
+    # Convert the list of tensors to a PyTorch tensor
+                
+    for key in detections.keys():
+        detections[key] = torch.tensor(detections[key])
+    
+    
+
+    return detections
+
 
 def add_noise2tensor(tensor, image_shape, noise_scale=9 / 10):
     """
@@ -174,6 +228,7 @@ def run(
     use_odometry=0,
     use_depth=0,
     kitti_seq = "0005",
+    testing = 0,
 ):
     # OP_MODE = "EVAL" #YOLO or EVAL; EVAL uses the ground truth detections
     is_ros = isinstance(source, image_converter)
@@ -203,7 +258,7 @@ def run(
     else:  # multiple models after --yolo_weights
         exp_name = "ensemble"
     exp_name = (
-        name + "_" + tracking_method + "_" + op_mode
+        kitti_seq
         if name
         else exp_name + "_" + reid_weights.stem
     )
@@ -247,8 +302,12 @@ def run(
             )
         bs = len(dataset)
     elif "kitti" in source:
+        #if testing is true, kitti_loader_base_path is {source}/testing else {source}/training, use path lib to join the paths
+        kitti_loader_base_path = Path(source) / ("testing" if testing else "training")
+        kitti_loader_base_path = str(kitti_loader_base_path)
+        # kitti_loader_base_path = 
         dataset = KittiLoader(
-            source,
+            kitti_loader_base_path,
             sequence=kitti_seq,
             imgsz=imgsz,
             stride=stride,
@@ -370,6 +429,7 @@ def run(
             curr_frames[i] = im0
             # if not is_ros:
             txt_path = str(project / text_file_name / text_file_name)  # im.txt
+            txt_path_kitti = txt_path + "_kitti"
             s += "%gx%g " % im.shape[2:]  # print string
             imc = im0.copy() if save_crop else im0  # for save_crop
 
@@ -503,7 +563,13 @@ def run(
                         depth_dict = dict()
                         depth_dict["header"] = "kitti"
                         depth_dict["depth_image"] = dataset.extra_output["depth_image"]
-                        outputs[i] = tracker_list[i].update(det.cpu(), im0, depth_dict, odom, None)
+                        if testing:
+                            dets_from_kitti = dataset.extra_output["dets"]
+                            #convert the dets_from_kitti to a torch tensor
+                            dets_from_kitti = torch.tensor(dets_from_kitti)
+                            outputs[i] = tracker_list[i].update(dets_from_kitti, im0, depth_dict, odom, None)
+                        else:
+                            outputs[i] = tracker_list[i].update(det.cpu(), im0, depth_dict, odom, None)
                     elif op_mode == "yolo":
                         outputs[i] = tracker_list[i].update(
                             det.cpu(), im0, depth_image, odom, None
@@ -513,7 +579,14 @@ def run(
                             modified_gt_list, im0, depth_image, odom, None
                         )
                 else:
-                    if op_mode == "yolo":
+                    if "kitti" in source:
+                        if testing:
+                            dets_from_kitti = dataset.extra_output["dets"]
+                            dets_from_kitti = torch.tensor(dets_from_kitti)
+                            outputs[i] = tracker_list[i].update(dets_from_kitti, im0)
+                        else:
+                            outputs[i] = tracker_list[i].update(det.cpu(), im0)
+                    elif op_mode == "yolo":
                         outputs[i] = tracker_list[i].update(det.cpu(), im0)
                     elif op_mode == "eval":
                         outputs[i] = tracker_list[i].update(modified_gt_list, im0)
@@ -548,12 +621,11 @@ def run(
                             else im[i],
                         )
 
-            save_gt = True
             gt_path = str(save_dir / "gt")  # im.txt
             # if gt_path does not exist, create it
             if not os.path.exists(gt_path):
                 os.makedirs(gt_path)
-            if save_gt and len(modified_annotation_gt_list) > 0:
+            if not testing and len(modified_annotation_gt_list) > 0 :
                 for gt in modified_annotation_gt_list:
                     this_frame_idx = frame_idx
                     this_id = gt[0]
@@ -597,6 +669,31 @@ def run(
                     bbox_w = output[2] - output[0]
                     bbox_h = output[3] - output[1]
                     # Write MOT compliant results to file
+                    with open(txt_path_kitti + ".txt", "a") as f:
+                        f.write(
+                            ("%g " * 2 + "%s " + "%g " * 15 + "\n")
+                            % (
+                                frame_idx,
+                                id,
+                                "Pedestrian" if cls == 0  else "Car",
+                                -1,
+                                -1,
+                                -1,
+                                bbox_left,  # MOT format
+                                bbox_top,
+                                bbox_w + bbox_left,
+                                bbox_h + bbox_top,
+                                -1,
+                                -1,
+                                -1,
+                                -1000,
+                                -1000,
+                                -1000,
+                                -10,
+                                1
+                            )
+                        )
+
                     with open(txt_path + ".txt", "a") as f:
                         f.write(
                             ("%g " * 10 + "\n")
@@ -768,48 +865,49 @@ def run(
         file.write("imExt=.jpg\n")
 
     # /home/rosen/TrackEval/scripts/run_mot_challenge.py
-    p = subprocess.Popen(
-        args=[
-            sys.executable,
-            Path("scripts") / "run_mot_challenge.py",
-            "--GT_FOLDER",
-            str(project),
-            "--BENCHMARK",
-            "",
-            "--TRACKERS_FOLDER",
-            save_dir,  # project/name
-            "--TRACKERS_TO_EVAL",
-            "mot",  # project/name/mot
-            "--SPLIT_TO_EVAL",
-            "train",
-            "--METRICS",
-            "HOTA",
-            "CLEAR",
-            "Identity",
-            "--USE_PARALLEL",
-            "False",
-            "--TRACKER_SUB_FOLDER",
-            "",
-            "--NUM_PARALLEL_CORES",
-            "4",
-            "--SKIP_SPLIT_FOL",
-            "True",
-            "--SEQ_INFO",
-            *[str(text_file_name)],
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    stdout, stderr = p.communicate()
+    if not testing:
+        p = subprocess.Popen(
+            args=[
+                sys.executable,
+                Path("scripts") / "run_mot_challenge.py",
+                "--GT_FOLDER",
+                str(project),
+                "--BENCHMARK",
+                "",
+                "--TRACKERS_FOLDER",
+                save_dir,  # project/name
+                "--TRACKERS_TO_EVAL",
+                "mot",  # project/name/mot
+                "--SPLIT_TO_EVAL",
+                "train",
+                "--METRICS",
+                "HOTA",
+                "CLEAR",
+                "Identity",
+                "--USE_PARALLEL",
+                "False",
+                "--TRACKER_SUB_FOLDER",
+                "",
+                "--NUM_PARALLEL_CORES",
+                "4",
+                "--SKIP_SPLIT_FOL",
+                "True",
+                "--SEQ_INFO",
+                *[str(text_file_name)],
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        stdout, stderr = p.communicate()
 
-    # Check the return code of the subprocess
-    if p.returncode != 0:
-        LOGGER.error(stderr)
-        LOGGER.error(stdout)
-        sys.exit(1)
+        # Check the return code of the subprocess
+        if p.returncode != 0:
+            LOGGER.error(stderr)
+            LOGGER.error(stdout)
+            sys.exit(1)
 
-    LOGGER.info(stdout)
+        LOGGER.info(stdout)
 
 
 def parse_opt():
@@ -951,6 +1049,8 @@ def parse_opt():
         default="0005",
         help="kitti sequence to use for tracking",
     )
+    parser.add_argument(
+        "--testing", type=int, default=0, help="testing on test dataset")
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     opt.tracking_config = (

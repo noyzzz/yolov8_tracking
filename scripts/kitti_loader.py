@@ -90,9 +90,10 @@ class KittiLoader:
         self._get_file_lists()
         self._load_calib()
         self._load_oxts() # it loads all the oxts data for a sequence. not an effiecient way to load oxts data
-        if "testing" in self.base_path:
-            self._load_dets() # it loads all the det data for a sequence. not an effiecient way to load dets data
-        else:
+        self.seq_dets = None #is used to load dets sequence from file
+        self.seq_gt = None #is used to load gt sequence from file
+        self._load_dets() # it loads all the det data for a sequence. not an effiecient way to load dets data
+        if not ("testing" in self.base_path):
             self._load_gt() # it loads all the gt data for a sequence. not an effiecient way to load gt data
 
 
@@ -121,12 +122,12 @@ class KittiLoader:
         
         assert len(self.cam2_files) == len(self.velo_files)
         
-        if "testing" in self.base_path:
-            self.dets_files = sorted(glob.glob(
-                os.path.join(self.base_path,
-                            'permatrack_kitti_test',
-                            f'{self.sequence}.txt')))
-        else:
+        self.dets_files = sorted(glob.glob(
+            os.path.join(self.base_path,
+                        'permatrack_kitti_test',
+                        f'{self.sequence}.txt')))
+        
+        if not("testing" in self.base_path):
             self.gt_files = sorted(glob.glob(
                 os.path.join(self.base_path,
                             'label_02',
@@ -240,11 +241,17 @@ class KittiLoader:
                 line_count+=1
                 line = line.strip()
                 tmps = line.strip().split()
+                if tmps[2] not in cats:
+                    continue # to skip any other class (including DontCare)
                 tmps[2] = cat_ids[tmps[2]]
                 trk = np.array([float(d) for d in tmps])
                 trk = np.expand_dims(trk, axis=0)
-                seq_trks = np.concatenate([seq_trks, trk], axis=0)
-        self.seq_trks = seq_trks
+                if not ("testing" in self.base_path):
+                   trk = np.concatenate([trk[0], np.array([0])])
+                   seq_trks = np.concatenate([seq_trks, trk.reshape(1,18)], axis=0)
+                else:
+                    seq_trks = np.concatenate([seq_trks, trk], axis=0)
+        self.seq_dets = seq_trks
     
     def _load_gt(self):
         """Load ground truth tracks from file."""
@@ -268,7 +275,7 @@ class KittiLoader:
                 trk = np.array([float(d) for d in tmps])
                 trk = np.expand_dims(trk, axis=0)
                 seq_trks = np.concatenate([seq_trks, trk], axis=0)
-        self.seq_trks = seq_trks
+        self.seq_gt = seq_trks
 
             
     def __getitem__(self, frame_index):
@@ -294,21 +301,19 @@ class KittiLoader:
         else:
             depthmap = None
 
-        # If we are in testing mode, load the detections from permatacks
-        if "testing" in self.base_path:
-            _det_ind = list(range(6,10)) + [-2, -1]
-            # Assuming that the frame index starts with 0 in detection file
-            dets = self.seq_trks[np.where(self.seq_trks[:,0]==frame_index)][:,_det_ind]
-            # Apply the data transformations
-            gt = None
+        _det_ind = list(range(6,10)) + [2, -1]
+        # Assuming that the frame index starts with 0 in detection file
+        dets = self.seq_dets[np.where(self.seq_dets[:,0]==frame_index)][:,_det_ind]
+        # Apply the data transformations
 
         # If we are in training mode, load the ground truth tracks from kitti
-        else:
-            dets = None
+        if not("testing" in self.base_path):
             _gt_ind = [1] + list(range(6,10))
-            gt_values = self.seq_trks[np.where(self.seq_trks[:,0]==frame_index)][:,_gt_ind]
+            gt_values = self.seq_gt[np.where(self.seq_gt[:,0]==frame_index)][:,_gt_ind]
             gt_keys = ["id", "min_x", "min_y", "max_x", "max_y"]
             gt  = [dict(zip(gt_keys, gt_value)) for gt_value in gt_values]
+        else:
+            gt = None
 
         oxt = self.oxts[frame_index]
 
