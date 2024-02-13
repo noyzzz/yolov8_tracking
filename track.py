@@ -230,6 +230,7 @@ def run(
     kitti_seq = "0005",
     testing = 0,
 ):
+    check_sum = 0
     # OP_MODE = "EVAL" #YOLO or EVAL; EVAL uses the ground truth detections
     is_ros = isinstance(source, image_converter)
     # copy source to avoid changing the original
@@ -582,6 +583,7 @@ def run(
                     if "kitti" in source:
                         if testing:
                             dets_from_kitti = dataset.extra_output["dets"]
+                            check_sum+=len(dets_from_kitti)
                             dets_from_kitti = torch.tensor(dets_from_kitti)
                             outputs[i] = tracker_list[i].update(dets_from_kitti, im0)
                         else:
@@ -647,42 +649,41 @@ def run(
                     with open(gt_path + "/gt.txt", "a") as f:
                         f.write(("%g " * 9 + "\n") % tuple(this_msg))
 
-            for j, (output) in enumerate(outputs[i]):
-                bbox = output[0:4]
-                id = output[4]
-                cls = output[5]
-                conf = output[6]
-                if len(output) > 7:
-                    depth = output[7]
-                    try:
-                        depth = float(depth)
-                    except:
-                        depth = -1
 
-                else:
-                    depth = -1
 
-                if save_txt:
-                    # to MOT format
-                    bbox_left = output[0]
-                    bbox_top = output[1]
-                    bbox_w = output[2] - output[0]
-                    bbox_h = output[3] - output[1]
-                    # Write MOT compliant results to file
+            if save_txt:
+                cats = ["Pedestrian", "Car", "Cyclist", "Van", "Truck"]
+                online_targets = outputs[i]
+                trk_num = online_targets.shape[0]
+                boxes = online_targets[:, :4]
+                ids = online_targets[:, 4]
+                frame_counts = online_targets[:, 6]
+                sorted_frame_counts = np.argsort(frame_counts)
+                frame_counts = frame_counts[sorted_frame_counts]
+                cates = online_targets[:, 5]
+                cates = cates[sorted_frame_counts].tolist()
+                cates = [cats[int(catid)] for catid in cates]
+                boxes = boxes[sorted_frame_counts]
+                ids = ids[sorted_frame_counts]
+                for trk in range(trk_num):
+                    lag_frame = frame_counts[trk]
+                    if frame_idx < 2 * 3 and lag_frame < 0:
+                        continue
+                # Write MOT compliant results to file
                     with open(txt_path_kitti + ".txt", "a") as f:
                         f.write(
                             ("%g " * 2 + "%s " + "%g " * 15 + "\n")
                             % (
-                                frame_idx,
-                                id,
-                                "Pedestrian" if cls == 0  else "Car",
+                                frame_idx + lag_frame,
+                                ids[trk],
+                                cates[trk],
                                 -1,
                                 -1,
                                 -1,
-                                bbox_left,  # MOT format
-                                bbox_top,
-                                bbox_w + bbox_left,
-                                bbox_h + bbox_top,
+                                boxes[trk][0],  # MOT format
+                                boxes[trk][1],
+                                boxes[trk][2],
+                                boxes[trk][3],
                                 -1,
                                 -1,
                                 -1,
@@ -698,18 +699,33 @@ def run(
                         f.write(
                             ("%g " * 10 + "\n")
                             % (
-                                frame_idx + 1,
-                                id,
-                                bbox_left,  # MOT format
-                                bbox_top,
-                                bbox_w,
-                                bbox_h,
+                                frame_idx + lag_frame + 1,
+                                ids[trk],
+                                boxes[trk][0],  # MOT format
+                                boxes[trk][1],
+                                boxes[trk][2] - boxes[trk][0],
+                                boxes[trk][3] - boxes[trk][1],
                                 -1,
                                 -1,
                                 -1,
                                 i,
                             )
                         )
+
+            for j, (output) in enumerate(outputs[i]):
+                bbox = output[0:4]
+                id = output[4]
+                cls = output[5]
+                conf = output[6]
+                if len(output) > 7:
+                    depth = output[7]
+                    try:
+                        depth = float(depth)
+                    except:
+                        depth = -1
+
+                else:
+                    depth = -1
 
                 if save_vid or save_crop or show_vid:  # Add bbox/seg to image
                     c = int(cls)  # integer class
@@ -908,6 +924,7 @@ def run(
             sys.exit(1)
 
         LOGGER.info(stdout)
+    print("checksum ", check_sum)
 
 
 def parse_opt():

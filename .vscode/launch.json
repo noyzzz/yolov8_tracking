@@ -10,7 +10,7 @@
                 "--source",
                 "/home/rosen/mhmd/vslam_ws/data/kittiMOT",
                 "--testing",
-                "1",
+                "0",
                 "--yolo-weights",
                 "yolov8x.pt",
                 "--img",
@@ -27,9 +27,9 @@
                 "--classes",
                 "0",
                 "2",
-                "--use-depth", "0",
-                "--use-odometry", "0",
-                "--kitti-seq", "0000",
+                "--use-depth", "1",
+                "--use-odometry", "1",
+                "--kitti-seq", "0011",
 
             ]
         },
