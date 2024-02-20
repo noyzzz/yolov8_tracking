@@ -370,7 +370,6 @@ class KalmanFilterNew(object):
         depth_control_mat[1, 0] = v_coeff
         depth_control_mat[2, 0] = w_coeff*h_coeff
         
-          #0#h_coeff FIXME: this is not correct, this is not h_coeff because the state definition here is not x, y, w, h
         return depth_control_mat
 
     def predict(self, u=None, B=None, F=None, Q=None, control_input=None):

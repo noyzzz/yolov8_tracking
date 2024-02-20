@@ -17,9 +17,9 @@ from torch.utils.tensorboard import SummaryWriter
 import datetime
 from ..MATracker import MATracker, MATrack
 
-IMG_WIDTH = 960
-IMG_HEIGHT = 540
-FOCAL_LENGTH = 480.0
+IMG_WIDTH = MATracker.IMG_WIDTH
+IMG_HEIGHT = MATracker.IMG_HEIGHT
+FOCAL_LENGTH = MATracker.FOCAL_LENGTH
 
 class STrack(BaseTrack, MATrack):
     shared_kalman = KalmanFilter(IMG_WIDTH, IMG_HEIGHT, FOCAL_LENGTH) #TODO check the parameters
@@ -222,8 +222,9 @@ class BYTETracker(MATracker):
     
     def update(self, dets, color_image, depth_image = None, odom = None, masks = None):
         self.update_time(odom, self.frame_id)
-        STrack.update_ego_motion(odom, self.fps)
-        STrack.update_depth_image(depth_image)
+        if odom is not None:
+            STrack.update_ego_motion(odom, self.fps)
+            STrack.update_depth_image(depth_image)
         #get the current time and compare it with the last time update was called
         time_now = time.time()
         self.time_window_list.append(1.0/(time_now - self.last_time))

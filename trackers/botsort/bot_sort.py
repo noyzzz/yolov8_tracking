@@ -23,9 +23,9 @@ from reid_multibackend import ReIDDetectMultiBackend
 from yolov8.ultralytics.yolo.utils.ops import xyxy2xywh, xywh2xyxy
 import time
 import datetime
-IMG_WIDTH = 960
-IMG_HEIGHT = 540
-FOCAL_LENGTH = 480.0
+IMG_WIDTH = MATracker.IMG_WIDTH
+IMG_HEIGHT = MATracker.IMG_HEIGHT
+FOCAL_LENGTH = MATracker.FOCAL_LENGTH
 
 class STrack(BaseTrack, MATrack):
     yaw_dot_list = deque(maxlen=2)

@@ -105,7 +105,7 @@ from numpy import dot, zeros, eye, isscalar, shape
 import numpy.linalg as linalg
 from filterpy.stats import logpdf
 from filterpy.common import pretty_str, reshape_z
-
+from ..MATracker import MATracker, MATrack
 
 class KalmanFilterNew(object):
     """Implements a Kalman filter. You are responsible for setting the
@@ -335,9 +335,9 @@ class KalmanFilterNew(object):
 
         self.attr_saved = None
         self.observed = False
-        IMG_WIDTH = 960
-        IMG_HEIGHT = 540
-        FOCAL_LENGTH = 480.0
+        IMG_WIDTH = MATracker.IMG_WIDTH
+        IMG_HEIGHT = MATracker.IMG_HEIGHT
+        FOCAL_LENGTH = MATracker.FOCAL_LENGTH
         self.image_width, self.image_height, self.focal_length = IMG_WIDTH, IMG_HEIGHT, FOCAL_LENGTH
         self.dt = 1
         self.control_mat = np.zeros((8, 1))
@@ -356,18 +356,21 @@ class KalmanFilterNew(object):
         v1 = mean[1] - self.image_height/2
         w = np.sqrt(mean[2] * mean[3])
         h = mean[2] / w
-        bottom_y = mean[1]+h/2.# v1 + mean[3]/2 #bottom right corner y wrt image center
-        right_x = mean[0]+w/2.# u1 + mean[2]/2 #bottom right corner x wrt image center
+        bottom_y = v1+h/2.# v1 + mean[3]/2 #bottom right corner y wrt image center
+        right_x = u1+w/2.# u1 + mean[2]/2 #bottom right corner x wrt image center
         u_coeff = u1*np.sqrt(u1**2 + self.focal_length**2)/(self.focal_length * control_signal[2])
         v_coeff = v1*np.sqrt(v1**2 + self.focal_length**2)/(self.focal_length * control_signal[2])
         h_coeff = (bottom_y*np.sqrt(bottom_y**2 + self.focal_length**2) - v1*np.sqrt(v1**2 + self.focal_length**2))\
                    /(self.focal_length * control_signal[2])
         w_coeff = (right_x*np.sqrt(right_x**2 + self.focal_length**2) - u1*np.sqrt(u1**2 + self.focal_length**2))\
                      /(self.focal_length * control_signal[2])
+        
+        
         depth_control_mat = np.zeros((8, 1))
         depth_control_mat[0, 0] = u_coeff
         depth_control_mat[1, 0] = v_coeff
         depth_control_mat[2, 0] = w_coeff*h_coeff
+        
         return depth_control_mat
 
     def predict(self, u=None, B=None, F=None, Q=None, control_input=None):

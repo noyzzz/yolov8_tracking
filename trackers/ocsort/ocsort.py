@@ -233,8 +233,8 @@ class OCSort(MATracker):
             KalmanBoxTracker.update_ego_motion(odom, self.fps)
             KalmanBoxTracker.update_depth_image(depth_image)
         # self.frame_count += 1
-        cates = dets[:, 4]
-        scores = dets[:, 5]
+        cates = dets[:, 5]
+        scores = dets[:, 4]
         dets = (dets[:, 0:4])
 
         # print("dets: ", dets)
