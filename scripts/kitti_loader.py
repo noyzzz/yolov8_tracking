@@ -246,11 +246,11 @@ class KittiLoader:
                 tmps[2] = cat_ids[tmps[2]]
                 trk = np.array([float(d) for d in tmps])
                 trk = np.expand_dims(trk, axis=0)
-                if not ("testing" in self.base_path):
-                   trk = np.concatenate([trk[0], np.array([0])])
-                   seq_trks = np.concatenate([seq_trks, trk.reshape(1,18)], axis=0)
-                else:
-                    seq_trks = np.concatenate([seq_trks, trk], axis=0)
+                # if not ("testing" in self.base_path):
+                #    trk = np.concatenate([trk[0], np.array([0])])
+                #    seq_trks = np.concatenate([seq_trks, trk.reshape(1,18)], axis=0)
+                # else:
+                seq_trks = np.concatenate([seq_trks, trk], axis=0)
         self.seq_dets = seq_trks
     
     def _load_gt(self):
