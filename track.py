@@ -259,7 +259,7 @@ def run(
     else:  # multiple models after --yolo_weights
         exp_name = "ensemble"
     exp_name = (
-        kitti_seq
+        kitti_seq + "_" + tracking_method + "_" + ("emap" if use_depth else "no_depth") 
         if name
         else exp_name + "_" + reid_weights.stem
     )
@@ -549,6 +549,20 @@ def run(
                     else:
                         modified_gt_list = torch.empty((0, 6))
                 outputs[i] = None
+                my_dets = det.cpu();
+                # for j in range(len(det.cpu())):
+                #     this_det = det.cpu()[j]
+                #     #take the first four as it is, but then put this_det[5], then this_det[4]
+                #     new_det = torch.cat(
+                #         (this_det[:4], this_det[5].unsqueeze(0), this_det[4].unsqueeze(0)))
+                #     my_dets.append(new_det)
+                #if my_dets is empty, then my_dets = torch.empty((0, 6))
+                # if len(my_dets):
+                #     my_dets = torch.stack(my_dets)
+                # else:
+                #     my_dets = torch.empty((0, 6))
+
+
                 track_pred_tlwhs = None
                 if (
                     hasattr(tracker_list[i], "use_depth")
@@ -564,16 +578,16 @@ def run(
                         depth_dict = dict()
                         depth_dict["header"] = "kitti"
                         depth_dict["depth_image"] = dataset.extra_output["depth_image"]
-                        if testing:
+                        if testing or op_mode != "yolo":
                             dets_from_kitti = dataset.extra_output["dets"]
                             #convert the dets_from_kitti to a torch tensor
                             dets_from_kitti = torch.tensor(dets_from_kitti)
                             outputs[i] = tracker_list[i].update(dets_from_kitti, im0, depth_dict, odom, None)
                         else:
-                            outputs[i] = tracker_list[i].update(det.cpu(), im0, depth_dict, odom, None)
+                            outputs[i] = tracker_list[i].update(my_dets, im0, depth_dict, odom, None)
                     elif op_mode == "yolo":
                         outputs[i] = tracker_list[i].update(
-                            det.cpu(), im0, depth_image, odom, None
+                            my_dets, im0, depth_image, odom, None
                         )
                     elif op_mode == "eval":
                         outputs[i] = tracker_list[i].update(
@@ -581,15 +595,16 @@ def run(
                         )
                 else:
                     if "kitti" in source:
-                        if testing:
+                        if testing or op_mode != "yolo":
                             dets_from_kitti = dataset.extra_output["dets"]
                             check_sum+=len(dets_from_kitti)
                             dets_from_kitti = torch.tensor(dets_from_kitti)
                             outputs[i] = tracker_list[i].update(dets_from_kitti, im0)
                         else:
-                            outputs[i] = tracker_list[i].update(det.cpu(), im0)
+                            #for det.cpu() swap 5th and 6th columns for all
+                            outputs[i] = tracker_list[i].update(my_dets, im0)
                     elif op_mode == "yolo":
-                        outputs[i] = tracker_list[i].update(det.cpu(), im0)
+                        outputs[i] = tracker_list[i].update(my_dets, im0)
                     elif op_mode == "eval":
                         outputs[i] = tracker_list[i].update(modified_gt_list, im0)
             #     track_pred_tlwhs = tracker_list[i].get_all_track_predictions()
@@ -651,7 +666,10 @@ def run(
 
 
 
-            if save_txt:
+            if save_txt and len(outputs[i]) > 0:
+                if type(outputs[i]) == list:
+                    #make it numpy array
+                    outputs[i] = np.array(outputs[i])
                 cats = ["Pedestrian", "Car", "Cyclist", "Van", "Truck"]
                 online_targets = outputs[i]
                 trk_num = online_targets.shape[0]
@@ -667,7 +685,7 @@ def run(
                 ids = ids[sorted_frame_counts]
                 for trk in range(trk_num):
                     lag_frame = frame_counts[trk]
-                    if frame_idx < 2 * 3 and lag_frame < 0:
+                    if frame_idx < 2 * 3 and lag_frame < 0: #FIXME: 3 is min hits
                         continue
                 # Write MOT compliant results to file
                     with open(txt_path_kitti + ".txt", "a") as f:
@@ -923,8 +941,12 @@ def run(
             LOGGER.error(stdout)
             sys.exit(1)
 
-        LOGGER.info(stdout)
+        # LOGGER.info(stdout)
     print("checksum ", check_sum)
+    if not testing:
+        return stdout
+    else:
+        return None
 
 
 def parse_opt():
@@ -1103,7 +1125,8 @@ def main(opt):
     )
     ic = ros_init(int(opt.ros_package))
     # opt.source = ic
-    run(**vars(opt))
+    eval_res = run(**vars(opt))
+    return eval_res
 
 
 # if __name__ == "__main__":
