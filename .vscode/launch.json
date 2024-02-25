@@ -23,7 +23,7 @@
                 "0",
                 "--ros-bag",
                 "0",
-                "--op-mode", "yolo",
+                "--op-mode", "perma",
                 "--classes",
                 "0",
                 "2",
@@ -59,9 +59,8 @@
                 "0",
                 "--ros-bag",
                 "0",
-                "--op-mode", "yolo",
+                "--op-mode", "perma",
                 "--classes",
-                "0",
                 "2",
                 "--use-depth", "1",
                 "--use-odometry", "1",
@@ -70,6 +69,12 @@
             ],
             "request": "launch",
             "program": "${workspaceFolder}/scripts/kitti_ds_evaluator.py"
+        },
+        {
+            "name": "Debug kitti_res_generator.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/kitti_res_generator.py"
         }
     ]
 }
