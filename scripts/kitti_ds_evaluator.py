@@ -3,7 +3,7 @@ def run_track_script():
     sys.path.append("./")
     from track import parse_opt, main
     opt = parse_opt()
-    for i in range(1, 2):
+    for i in range(0, 21):
         for tracker_type in ['ocsort', 'deepocsort', 'emap', "bytetrack", 'botsort' ]:
             for j in range(0, 2):
                 if j == 0:
@@ -25,12 +25,14 @@ def run_track_script():
                 #print configuration
                 print(f"KITTI sequence {kitti_seq} with tracker {tracker_type} using depth {use_depth} and odometry {use_odometry}")
                 eval_res = main(opt)
+                if eval_res is None:
+                    print(f"KITTI sequence {kitti_seq} evaluation results: None")
+                    continue
                 eval_str_list = eval_res.split("\n")
                 lines_to_select = [63,64, 67, 68, 71, 72]
                 for line in lines_to_select:
                     print(eval_str_list[line])
                 # print(f"KITTI sequence {kitti_seq} evaluation results: {eval_res}")
-
 
 if __name__ == "__main__":
     run_track_script()

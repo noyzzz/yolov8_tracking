@@ -670,7 +670,7 @@ def run(
                 if type(outputs[i]) == list:
                     #make it numpy array
                     outputs[i] = np.array(outputs[i])
-                cats = ["Pedestrian", "Car", "Cyclist", "Van", "Truck"]
+                cats = ["Pedestrian", "Cyclist","Car", "Van", "Truck"]
                 online_targets = outputs[i]
                 trk_num = online_targets.shape[0]
                 boxes = online_targets[:, :4]
@@ -684,8 +684,9 @@ def run(
                 boxes = boxes[sorted_frame_counts]
                 ids = ids[sorted_frame_counts]
                 for trk in range(trk_num):
-                    lag_frame = frame_counts[trk]
-                    if frame_idx < 2 * 3 and lag_frame < 0: #FIXME: 3 is min hits
+                    MIN_HITS = 0
+                    lag_frame = 0#frame_counts[trk]
+                    if frame_idx < 2 * MIN_HITS and lag_frame < 0: #FIXME: 3 is min hits
                         continue
                 # Write MOT compliant results to file
                     with open(txt_path_kitti + ".txt", "a") as f:

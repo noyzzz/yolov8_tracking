@@ -228,8 +228,10 @@ class KittiLoader:
 
         """
         for seq_file in self.dets_files:
-            cats = ['Pedestrian', 'Car', 'Cyclist', "Van", "Truck"]
-            cat_ids = {cat: i for i, cat in enumerate(cats)}
+            cats = ['Pedestrian', 'Car']
+            cat_ids = {}
+            for cat in (cats):
+                cat_ids[cat] = self.retrieve_cat_ids(cat)
 
             print("starting seq {}".format(self.sequence))
             seq_trks = np.empty((0, 18))
@@ -252,12 +254,20 @@ class KittiLoader:
                 # else:
                 seq_trks = np.concatenate([seq_trks, trk], axis=0)
         self.seq_dets = seq_trks
+
+    def retrieve_cat_ids(self, cat):
+        if cat == "Pedestrian":
+            return 0
+        elif cat == "Car":
+            return 2
     
     def _load_gt(self):
         """Load ground truth tracks from file."""
         for seq_file in self.gt_files:
-            cats = ['Pedestrian', 'Car', 'Van']
-            cat_ids = {cat: i for i, cat in enumerate(cats)}
+            cats = ['Pedestrian', 'Car']
+            cat_ids = {}
+            for cat in (cats):
+                cat_ids[cat] = self.retrieve_cat_ids(cat)
 
             print("starting seq {}".format(self.sequence))
             seq_trks = np.empty((0, 17))
@@ -301,7 +311,7 @@ class KittiLoader:
         else:
             depthmap = None
 
-        _det_ind = list(range(6,10)) + [2, -1]
+        _det_ind = list(range(6,10)) + [-1, 2]
         # Assuming that the frame index starts with 0 in detection file
         dets = self.seq_dets[np.where(self.seq_dets[:,0]==frame_index)][:,_det_ind]
         # Apply the data transformations

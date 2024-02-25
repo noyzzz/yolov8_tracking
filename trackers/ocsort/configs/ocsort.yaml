@@ -3,9 +3,9 @@
 ocsort:
   asso_func: iou
   delta_t: 3
-  det_thresh: 0.0
+  det_thresh: 0.6
   inertia: 0.2
   iou_thresh: 0.3
   max_age: 30
-  min_hits: 1
+  min_hits: 0
   use_byte: false
