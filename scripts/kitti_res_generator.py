@@ -94,7 +94,7 @@ def generate_res_tables(res_folder_name):
         for value in average_no_depth[key]:
             val = round(value, 2)
             #print value in 7 characters, use formatting
-            print(f"{(val):^7}", end=", ")
+            print(f"{(val):^7}", end="& ")
         print()
     print("Average results for depth use")
     #do the same for average_depth_use
@@ -110,7 +110,7 @@ def generate_res_tables(res_folder_name):
         for value in average_depth_use[key]:
             val = round(value, 2)
             #print value in 7 characters, use formatting
-            print(f"{(val):^7}", end=", ")
+            print(f"{(val):^7}", end="& ")
         print()
         
 
@@ -123,4 +123,4 @@ def generate_res_tables(res_folder_name):
 
 
 if __name__ == "__main__":
-    generate_res_tables("runs/mot_eval_yolo/mot_eval")
+    generate_res_tables("runs/mot_eval_trans_only_kitti")
