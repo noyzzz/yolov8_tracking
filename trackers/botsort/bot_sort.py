@@ -386,9 +386,9 @@ class BoTSORT(MATracker):
         STrack.multi_predict(strack_pool)
 
         # Fix camera motion
-        warp = self.gmc.apply(img, dets)
-        STrack.multi_gmc(strack_pool, warp)
-        STrack.multi_gmc(unconfirmed, warp)
+        # warp = self.gmc.apply(img, dets)
+        # STrack.multi_gmc(strack_pool, warp)
+        # STrack.multi_gmc(unconfirmed, warp)
 
         # Associate with high score detection boxes
         raw_emb_dists = matching.embedding_distance(strack_pool, detections)
