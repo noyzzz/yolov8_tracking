@@ -9,6 +9,8 @@ import cv2
 import numpy as np
 import sys
 sys.path.append("../")
+sys.path.append("./")
+
 import time
 
 from extern.build import depth_utils
@@ -360,7 +362,116 @@ class KittiLoader:
         """Return the number of frames loaded."""
         return len(self.cam2_files)
     
+class KittiLoaderVODP(KittiLoader):
+    def __init__(self, kitii_base_path: str, sequence: str, imgsz=640, stride=32, auto=True, transforms=None, **kwargs):
+        super(KittiLoaderVODP, self).__init__(kitii_base_path, sequence, imgsz, stride, auto, transforms, **kwargs)
+        self._load_dets()
+        self._load_gt()
 
+    def _get_file_lists(self):
+        """Find and list data files for each sensor."""
+        self.cam2_files = sorted(glob.glob(
+            os.path.join(self.base_path,
+                         'image_02',
+                         self.sequence,
+                         '*.{}'.format(self.imtype))))
+        self.cam3_files = sorted(glob.glob(
+            os.path.join(self.base_path,
+                         'image_03',
+                         self.sequence,
+                         '*.{}'.format(self.imtype))))
+        
+        self.depth_files = sorted(glob.glob( #FIXME: 
+            os.path.join(self.base_path,
+                        'depth',
+                        self.sequence,
+                         '*.npy')))
+        
+        self.motion_files = sorted(glob.glob(
+            os.path.join(self.base_path,
+                        'pred_motion',
+                         f'{self.sequence}',
+                         f'pred_motion.txt')))
+        
+        # assert len(self.cam2_files) == len(self.depth_files)
+        
+        self.dets_files = sorted(glob.glob(
+            os.path.join(self.base_path,
+                        'permatrack_kitti_test',
+                        f'{self.sequence}.txt')))
+        
+        if not("testing" in self.base_path):
+            self.gt_files = sorted(glob.glob(
+                os.path.join(self.base_path,
+                            'label_02',
+                            f'{self.sequence}.txt')))
+            
+    def _load_oxts(self):
+        oxts = [] #since the pose network outputs stats from frame 1, we put the first motion as zero
+        oxts.append(utils.MotionData(utils.MotionPacket(*([0]*6), None, None)))
+        for filename in self.motion_files:
+            with open(filename, 'r') as f:
+                for line in f.readlines():
+                    line = line.split()
+                    # Last five entries are flags and counts
+                    line = [float(x) for x in line]
+                    line = np.array(line[:12])
+                    pred_motions = utils.SE2se(utils.line2mat(line)) # convert trf(12) to 3_trans + 3_rot
+                    
+                    packet = utils.MotionPacket(*pred_motions, None, None)
+                    oxts.append(utils.MotionData(packet))
+
+        self.oxts = oxts
+
+    def _load_calib(self): #TODO: I think all of them now should be eye(4) except for imu2cam just to make it compatible with the rest of the code
+        """Load and compute intrinsic and extrinsic calibration parameters."""
+        data = {}
+        data['T_imu_cam'] = np.array([[0, 0, 0, 1],[-1, 0, 0, 0],[0, -1, 0, 0],[0, 0, 0, 1]])
+        data['R_rect'] = np.eye(3)
+
+        self._calib = namedtuple('CalibData', data.keys())(*data.values())
+        
+    def __getitem__(self, frame_index):
+        """Return the data from a particular frame_index."""
+        # Load the data from disk
+        cam2_0 = cv2.imread(self.cam2_files[frame_index].strip())
+
+        if self.kwargs.get("depth_image", False):
+            pred_disp = np.load(self.depth_files[frame_index].strip())
+            depthmap = 1 / pred_disp
+
+        else:
+            depthmap = None
+
+        _det_ind = list(range(6,10)) + [-1, 2]
+        # Assuming that the frame index starts with 0 in detection file
+        dets = self.seq_dets[np.where(self.seq_dets[:,0]==frame_index)][:,_det_ind]
+        # Apply the data transformations
+
+        # If we are in training mode, load the ground truth tracks from kitti
+        if not("testing" in self.base_path):
+            _gt_ind = [1] + list(range(6,10))
+            gt_values = self.seq_gt[np.where(self.seq_gt[:,0]==frame_index)][:,_gt_ind]
+            gt_keys = ["id", "min_x", "min_y", "max_x", "max_y"]
+            gt  = [dict(zip(gt_keys, gt_value)) for gt_value in gt_values]
+        else:
+            gt = None
+
+        oxt = self.oxts[frame_index]
+
+        if self.transforms is not None:
+            cam2 = self.transforms(cam2_0)
+        else:
+            cam2 = LetterBox(self.imgsz, self.auto, stride=self.stride)(image=cam2_0)
+            cam2 = cam2.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
+            cam2 = np.ascontiguousarray(cam2)  # contiguous
+        
+        
+        self.extra_output = {"depth_image": depthmap, "velodyne": None, "oxt": oxt, "dets": dets, "gt": gt}
+
+        return self.base_path, cam2, [cam2_0], None, "", self.extra_output
+    
+    
 if __name__ == "__main__":
     import time
     # for i in range(21):
@@ -388,7 +499,7 @@ if __name__ == "__main__":
     #         print("error in sequence {}".format(sequence))
     #         continue
 
-    dataset = KittiLoader("/home/rosen/mhmd/vslam_ws/data/kittiMOT/training", "0000", transforms = None, depth_image=True)
+    dataset = KittiLoaderVODP("/home/rosen/mhmd/vslam_ws/data/kittiMOT/training", "0014", transforms = None, depth_image=True)
     # print(len(dataset))
     # print(dataset[-1])
     data = dataset[0]

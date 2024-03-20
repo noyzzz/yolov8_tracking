@@ -5,6 +5,8 @@ import sys
 sys.path.append("../")
 import time
 from extern.build import depth_utils
+from scipy.spatial.transform import Rotation as R
+
 
 def rotx(t):
     """Rotation about the x-axis."""
@@ -327,6 +329,35 @@ def approx_depth(velodata, intr_raw, M_velo2cam, width, height, points_count_thr
     # print("Time taken: ", time.time() - t1)
     return reconstructed_image
 
+# from github.com/castacks/DytanVO/blob/main/evaluator/transformation.py
+def SEs2ses(data):
+    '''
+    data: N x 12
+    ses: N x 6
+    '''
+    data_size = data.shape[0]
+    ses = np.zeros((data_size,6))
+    for i in range(0,data_size):
+        ses[i,:] = SE2se(line2mat(data[i]))
+    return ses
+
+def SE2se(SE_data):
+    result = np.zeros((6))
+    result[0:3] = np.array(SE_data[0:3,3].T)
+    result[3:6] = SO2so(SE_data[0:3,0:3]).T
+    return result
+
+def SO2so(SO_data):
+    return R.from_matrix(SO_data).as_rotvec()
+
+
+def line2mat(line_data):
+    '''
+    12 -> 4 x 4
+    '''
+    mat = np.eye(4)
+    mat[0:3,:] = line_data.reshape(3,4)
+    return np.matrix(mat)
 
 OxtsData = namedtuple('OxtsData', 'packet, T_w_imu')
 
@@ -339,6 +370,13 @@ OxtsPacket = namedtuple('OxtsPacket',
                         'pos_accuracy, vel_accuracy, ' +
                         'navstat, numsats, ' +
                         'posmode, velmode, orimode')
+
+MotionPacket = namedtuple('MotionPacket',
+                        'vf, vl, vu, ' +
+                        'wf, wl, wu, ' +
+                        'trsl_accuracy, rot_accuracy, ')
+
+MotionData = namedtuple('MotionData', 'packet')
 
 if __name__ == "__main__":
 

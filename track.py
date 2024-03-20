@@ -12,7 +12,7 @@ import rospy
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
-from scripts.kitti_loader import KittiLoader
+from scripts.kitti_loader import KittiLoader, KittiLoaderVODP
 from unit_tests.kitti_tests import test_kitti_odom, test_kitti_depth
 # sys.path.append("/home/rosen/tracking_catkin_ws/src/my_tracker")
 print(sys.path)
@@ -307,7 +307,7 @@ def run(
         kitti_loader_base_path = Path(source) / ("testing" if testing else "training")
         kitti_loader_base_path = str(kitti_loader_base_path)
         # kitti_loader_base_path = 
-        dataset = KittiLoader(
+        dataset = KittiLoaderVODP(
             kitti_loader_base_path,
             sequence=kitti_seq,
             imgsz=imgsz,
