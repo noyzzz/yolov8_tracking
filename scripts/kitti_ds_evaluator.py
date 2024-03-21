@@ -3,9 +3,9 @@ def run_track_script():
     sys.path.append("./")
     from track import parse_opt, main
     opt = parse_opt()
-    for i in range(0, 21):
-        for tracker_type in ["botsort"]:# ['ocsort', 'deepocsort', 'emap', "bytetrack", 'botsort' ]:
-            for j in range(1, 2):
+    for i in range(14, 15):
+        for tracker_type in ["bytetrack", "emap"]:# ['ocsort', 'deepocsort', 'emap', "bytetrack", 'botsort' ]:
+            for j in range(0, 2):
                 if j == 0:
                     use_depth = False
                     use_odometry = False

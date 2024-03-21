@@ -69,7 +69,7 @@ class STrack(BaseTrack, MATrack):
         self.kalman_filter = kalman_filter
         self.track_id = self.next_id()
         
-        self.mean, self.covariance = self.kalman_filter.initiate(self.tlwh_to_xyah(self._tlwh))
+        self.mean, self.covariance = self.kalman_filter.initiate(np.append(self.tlwh_to_xyah(self._tlwh), self.get_d1()))
 
         self.tracklet_len = 0
         self.state = TrackState.Tracked
@@ -79,11 +79,11 @@ class STrack(BaseTrack, MATrack):
         self.frame_id = frame_id
         self.start_frame = frame_id
 
-    def re_activate(self, new_track, frame_id, new_id=False): #TODO kalamn update should be called with odom
+    def re_activate(self, new_track, frame_id, new_id=False): 
         #initialize the measurement mask to all trues with size 5
 
         self.mean, self.covariance = self.kalman_filter.update(
-            self.mean, self.covariance, self.tlwh_to_xyah(new_track.tlwh))
+            self.mean, self.covariance, np.append(self.tlwh_to_xyah(self._tlwh), self.get_d1()))
         self.tracklet_len = 0
         self.state = TrackState.Tracked
         self.is_activated = True
@@ -105,7 +105,7 @@ class STrack(BaseTrack, MATrack):
         self.frame_id = frame_id
         self.tracklet_len += 1
         # self.cls = cls
-        measurement = self.tlwh_to_xyah(new_track.tlwh)
+        measurement = np.append(self.tlwh_to_xyah(new_track.tlwh), self.get_d1())    
         
         self.mean, self.covariance = self.kalman_filter.update(
             self.mean, self.covariance, measurement)
@@ -300,7 +300,7 @@ class BYTETracker(MATracker):
         matches, u_track, u_detection = matching.linear_assignment(dists, thresh=self.match_thresh)
 
         for itracked, idet in matches:
-            track = strack_pool[itracked]
+            track:STrack = strack_pool[itracked]
             det = detections[idet]
             if track.state == TrackState.Tracked:
                 track.update(detections[idet], self.frame_id)
@@ -404,7 +404,7 @@ class BYTETracker(MATracker):
         return outputs
 #track_id, class_id, conf
 
-def joint_stracks(tlista, tlistb):
+def joint_stracks(tlista, tlistb) -> List[STrack]:
     exists = {}
     res = []
     for t in tlista:
