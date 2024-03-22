@@ -192,7 +192,7 @@ class BYTETracker(MATracker):
         self.lost_stracks = []  # type: list[STrack]
         self.removed_stracks = []  # type: list[STrack]
         self.frame_id = 0
-        self.write_log = False
+        self.write_log = True
         self.track_buffer=track_buffer
         self.track_thresh = track_thresh
         self.match_thresh = match_thresh
@@ -204,8 +204,7 @@ class BYTETracker(MATracker):
         self.time_window_list.append(30)
         self.last_time = time.time()
         #initialize self.writer tensorboard writer
-        self.writer = SummaryWriter(f"./runs/slow/{self.kalman_filter._q1:0.3f}_{self.kalman_filter._q4:0.5f}_{self.kalman_filter._r1:0.3f}\
-                                    __{datetime.datetime.now().strftime('%Y-%m-%d_%H:%M')}")
+        self.writer = SummaryWriter(f"./runs/debug/{self.kalman_filter._q1:0.3f}_{self.kalman_filter._q4:0.5f}_{self.kalman_filter._r1:0.3f}__{datetime.datetime.now().strftime('%Y-%m-%d_%H:%M')}")
 
     def get_all_track_predictions(self):
         """
@@ -291,7 +290,6 @@ class BYTETracker(MATracker):
             #         y: {track_print.mean[1]:>5.2f}, y_dot: {track_print.mean[5]:>5.2f}, y_cov: {track_print.covariance[1,1]:>5.2f}\
             #             , current_yaw_dot:   {STrack.current_yaw_dot:>5.2f}")
             # print (f"track id: , {track_print.track_id:>5},  x_dot:  , {100*track_print.mean[4]:>5.2f}, x_cov:  {track_print.covariance[0,0]:>5.2f} , current_yaw_dot:   {100*STrack.current_yaw_dot:>5.2f}", flush=True)
-
         # Predict the current location with KF
         STrack.multi_predict(strack_pool)
         dists = matching.iou_distance(strack_pool, detections)
@@ -370,6 +368,41 @@ class BYTETracker(MATracker):
                 removed_stracks.append(track)
 
         # print('Ramained match {} s'.format(t4-t3))
+        if self.write_log:
+            #take log from the track means and covariances and visualize them in tensorboard
+            for track in self.tracked_stracks:
+                track_id = track.track_id
+                mean = track.mean
+                covariance = track.covariance
+                if self.writer:
+                    # self.writer.add_scalar(f"loc/Track {track_id} x", mean[0], self.frame_id)
+                    # self.writer.add_scalar(f"loc/Track {track_id} y", mean[1], self.frame_id)
+                    # self.writer.add_scalar(f"loc/Track {track_id} a", mean[2], self.frame_id)
+                    # self.writer.add_scalar(f"loc/Track {track_id} h", mean[3], self.frame_id)
+                    self.writer.add_scalars(f"loc/Track {track_id} d", {"d_hat":mean[4],
+                                                                        "d_meas": track.get_d1()}, self.frame_id)
+                    # self.writer.add_scalar(f"loc/Track {track_id} d_meas", track.get_d1(), self.frame_id)
+                    # self.writer.add_scalar(f"vel/Track {track_id} x_dot", mean[5], self.frame_id)
+                    # self.writer.add_scalar(f"vel/Track {track_id} y_dot", mean[6], self.frame_id)
+                    # self.writer.add_scalar(f"vel/Track {track_id} a_dot", mean[7], self.frame_id)
+                    # self.writer.add_scalar(f"vel/Track {track_id} h_dot", mean[8], self.frame_id)
+                    self.writer.add_scalar(f"vel/Track {track_id} d_dot", mean[9], self.frame_id)
+                    # self.writer.add_scalar(f"loc_cov/Track {track_id} x_cov", covariance[0,0], self.frame_id)
+                    # self.writer.add_scalar(f"loc_cov/Track {track_id} y_cov", covariance[1,1], self.frame_id)
+                    # self.writer.add_scalar(f"loc_cov/Track {track_id} a_cov", covariance[2,2], self.frame_id)
+                    # self.writer.add_scalar(f"loc_cov/Track {track_id} h_cov", covariance[3,3], self.frame_id)
+                    self.writer.add_scalar(f"loc_cov/Track {track_id} d_cov", covariance[4,4], self.frame_id)
+                    # self.writer.add_scalar(f"vel_cov/Track {track_id} x_dot_cov", covariance[5,5], self.frame_id)
+                    # self.writer.add_scalar(f"vel_cov/Track {track_id} y_dot_cov", covariance[6,6], self.frame_id)
+                    # self.writer.add_scalar(f"vel_cov/Track {track_id} a_dot_cov", covariance[7,7], self.frame_id)
+                    # self.writer.add_scalar(f"vel_cov/Track {track_id} h_dot_cov", covariance[8,8], self.frame_id)
+                    # self.writer.add_scalar(f"vel_cov/Track {track_id} d_dot_cov", covariance[9,9], self.frame_id)
+                    # self.writer.add_scalar("vel/current_yaw_dot/raw", STrack.current_yaw_dot, self.frame_id)
+                    # self.writer.add_scalars('current_yaw_dot', {'raw': STrack.current_yaw_dot,
+                                                                # 'filtered': STrack.current_yaw_dot_filtered}, self.frame_id)
+                    # self.writer.add_scalar(f"vel/current_yaw_dot_filtered", STrack.current_yaw_dot_filtered, self.frame_id)
+                    #flush the writer
+                    self.writer.flush()
 
         self.tracked_stracks = [t for t in self.tracked_stracks if t.state == TrackState.Tracked]
         self.tracked_stracks = joint_stracks(self.tracked_stracks, activated_starcks)

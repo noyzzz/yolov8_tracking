@@ -15,7 +15,7 @@
                 "yolov8x.pt",
                 "--img",
                 "320",
-                "--tracking-method",   "deepocsort",
+                "--tracking-method",   "ocsort",
                 "--show-vid",
                 "--name",       "day_dummy_sc3",
                 "--save-txt",
@@ -29,7 +29,7 @@
                 "2",
                 "--use-depth", "1",
                 "--use-odometry", "1",
-                "--kitti-seq", "0000",
+                "--kitti-seq", "0014",
 
             ]
         },
@@ -41,10 +41,10 @@
         },
         {
             "name": "Debug kitti_ds_evaluator.py",
-            "type": "python",
+            "type": "debugpy",
             "args": [
                 "--source",
-                "/home/rosen/mhmd/vslam_ws/data/kittiMOT",
+                "/home/apera/mhmd/kittiMOT/data_kittiMOT",
                 "--testing",
                 "0",
                 "--yolo-weights",

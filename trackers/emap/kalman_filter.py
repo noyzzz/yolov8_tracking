@@ -65,7 +65,7 @@ class KalmanFilter(object):
         self._q1 = 1./20
         self._q4 = 1./160
         self._r1 = 1/20
-        self._d_std = 1/20
+        self._d_std = 1/80
 
         self._r4 = 1./160 #to initiate P matrix ONLY
 
@@ -144,7 +144,7 @@ class KalmanFilter(object):
         covariance = np.diag(np.square(std))*10
         return mean, covariance
 
-    def predict(self, mean, covariance, input_signal):
+    # def predict(self, mean, covariance, input_signal):
         """Run Kalman filter prediction step.
 
         Parameters
@@ -226,7 +226,7 @@ class KalmanFilter(object):
             self._r1 * mean[3],
             1e-1,
             self._r1 * mean[3],
-            self._d_std * mean[4]]
+            self._d_std * mean[3]]
         
         innovation_cov = np.diag(np.square(std))
 
@@ -269,13 +269,13 @@ class KalmanFilter(object):
             self._q1 * (mean[:, 3]) ,
             1e-2 * (mean[:, 3]),
             self._q1 * (mean[:, 3]),
-            self._d_std * (mean[:, 4])]
+            self._d_std * (mean[:, 3])*500]
         std_vel = [
             self._q4 * (mean[:, 3]) ,
             self._q4 * (mean[:, 3]) ,
             1e-5 * (mean[:, 3]),
             self._q4 * (mean[:, 3]),
-            self._q4 * (mean[:, 4])]
+            self._q4 * (mean[:, 3])*500]
         
         sqr = np.square(np.r_[std_pos, std_vel]).T
         
