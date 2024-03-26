@@ -4,8 +4,8 @@ def run_track_script():
     from track import parse_opt, main
     opt = parse_opt()
     for i in range(0, 21):
-        for tracker_type in ["botsort"]:# ['ocsort', 'deepocsort', 'emap', "bytetrack", 'botsort' ]:
-            for j in range(1, 2):
+        for tracker_type in ['ocsort', 'deepocsort', 'emap', "bytetrack", 'botsort' ]:
+            for j in range(0, 2):
                 if j == 0:
                     use_depth = False
                     use_odometry = False

@@ -23,6 +23,13 @@ def create_tracker(tracker_type, tracker_config, reid_weights, device, half, use
 
         )
         return strongsort
+    elif tracker_type == "debugtrack":
+        from trackers.debugtrack.debugtrack import DebugTracker
+        debugtrack = DebugTracker(
+            use_depth=use_depth,
+            use_odometry=use_odometry
+        )
+        return debugtrack
     
     elif tracker_type == 'ocsort':
         from trackers.ocsort.ocsort import OCSort

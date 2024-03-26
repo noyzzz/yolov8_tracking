@@ -123,4 +123,4 @@ def generate_res_tables(res_folder_name):
 
 
 if __name__ == "__main__":
-    generate_res_tables("runs/mot_eval_trans_only_kitti")
+    generate_res_tables("runs/mot_perma")

@@ -86,10 +86,13 @@ class MATrack (ABC):
             v_cam = np.dot(t_cam_imu, v_imu)
             current_z_velocity_cam = v_cam[2, 0]
             current_yaw_dot = oxt_packet.wu / fps_rot
+            # print(f"wu: {oxt_packet.wu* MATrack.DEBUG_SCALE_YAW}, wl: {oxt_packet.wl*  MATrack.DEBUG_SCALE_YAW}, wf: {oxt_packet.wf* MATrack.DEBUG_SCALE_YAW}")
             MATrack.current_yaw_dot = current_yaw_dot
             MATrack.yaw_dot_list.append(MATrack.current_yaw_dot)
             MATrack.current_yaw_dot_filtered = np.mean(MATrack.yaw_dot_list)
             MATrack.current_D_dot = current_z_velocity_cam / fps_rot
+            MATrack.current_D_dot = MATrack.current_D_dot 
+            # print(f"current_yaw_dot: {current_yaw_dot}, current_D_dot: {MATrack.current_D_dot}")
             return
         quat = False
         if quat:

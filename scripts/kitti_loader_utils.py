@@ -373,7 +373,7 @@ OxtsPacket = namedtuple('OxtsPacket',
 
 MotionPacket = namedtuple('MotionPacket',
                         'vf, vl, vu, ' +
-                        'wf, wl, wu, ' +
+                        'wf, wu, wl, ' +
                         'trsl_accuracy, rot_accuracy, ')
 
 MotionData = namedtuple('MotionData', 'packet')

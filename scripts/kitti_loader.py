@@ -417,8 +417,9 @@ class KittiLoaderVODP(KittiLoader):
                     line = [float(x) for x in line]
                     line = np.array(line[:12])
                     pred_motions = utils.SE2se(utils.line2mat(line)) # convert trf(12) to 3_trans + 3_rot
-                    
-                    packet = utils.MotionPacket(*pred_motions, None, None)
+                    pred_motions_scale = self.scale_oxt(pred_motions)
+
+                    packet = utils.MotionPacket(*pred_motions_scale, None, None)
                     oxts.append(utils.MotionData(packet))
 
         self.oxts = oxts
@@ -426,7 +427,7 @@ class KittiLoaderVODP(KittiLoader):
     def _load_calib(self): #TODO: I think all of them now should be eye(4) except for imu2cam just to make it compatible with the rest of the code
         """Load and compute intrinsic and extrinsic calibration parameters."""
         data = {}
-        data['T_imu_cam'] = np.array([[0, 0, 0, 1],[-1, 0, 0, 0],[0, -1, 0, 0],[0, 0, 0, 1]])
+        data['T_imu_cam'] = np.array([[1, 0, 0, 0],[0, 1, 0, 0],[0, 0, -1, 0],[0, 0, 0, 1]])
         data['R_rect'] = np.eye(3)
 
         self._calib = namedtuple('CalibData', data.keys())(*data.values())
@@ -470,6 +471,12 @@ class KittiLoaderVODP(KittiLoader):
         self.extra_output = {"depth_image": depthmap, "velodyne": None, "oxt": oxt, "dets": dets, "gt": gt}
 
         return self.base_path, cam2, [cam2_0], None, "", self.extra_output
+    
+    @staticmethod
+    def scale_oxt(motion_array_se):
+        scale_mat = np.array( [9,9,9,10,10,10])
+        return motion_array_se * scale_mat
+
     
     
 if __name__ == "__main__":
