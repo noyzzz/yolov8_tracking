@@ -21,13 +21,3 @@ cd EMAP
 pip install -r requirements.txt
 
 
-## Usage
-To integrate EMAP with your existing MOT framework:
-```python
-from emap import EMAPTracker
-
-# Initialize your base tracker
-base_tracker = YourBaseTracker()
-
-# Wrap it with EMAP
-tracker = EMAPTracker(base_tracker, camera_motion_params, depth_image)
