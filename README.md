@@ -18,9 +18,9 @@ The EMAP (Ego-Motion Aware Target Prediction) module is a novel enhancement for 
 
 ## Getting Started
 Clone the repository and install dependencies:
-
+```bash
 git clone https://github.com/noyzzz/EMAP.git
 cd EMAP
 pip install -r requirements.txt
-
+```bash
 
