@@ -3,6 +3,9 @@
 ## Introduction
 The EMAP (Ego-Motion Aware Target Prediction) module is a novel enhancement for detection-based multi-object tracking (DBT) systems, designed to mitigate the challenges posed by dynamic camera movements in tracking scenarios such as autonomous driving. This Kalman Filter-based prediction module significantly reduces identity switches and improves overall tracking performance by integrating camera motion and depth information into object motion models.
 
+![EMAP Integration](emap_integration.jpg)  
+*Figure 1: EMAP integration improves tracking performance in challenging scenarios.*
+
 ## Features
 - **Integration with Existing MOT Algorithms:** Compatible with state-of-the-art trackers like OC-SORT, Deep OC-SORT, ByteTrack, and BoT-SORT.
 - **Reduction in Identity Switches:** Demonstrates a significant reduction in identity switches, enhancing tracking continuity and accuracy.
