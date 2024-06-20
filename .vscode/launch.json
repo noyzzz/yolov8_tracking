@@ -15,7 +15,7 @@
                 "yolov8x.pt",
                 "--img",
                 "320",
-                "--tracking-method",   "debugtrack",
+                "--tracking-method",   "emap",
                 "--show-vid",
                 "--name",       "day_dummy_sc3",
                 "--save-txt",
