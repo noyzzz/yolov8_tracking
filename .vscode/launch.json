@@ -41,10 +41,10 @@
         },
         {
             "name": "Debug kitti_ds_evaluator.py",
-            "type": "python",
+            "type": "debugpy",
             "args": [
                 "--source",
-                "/home/rosen/mhmd/vslam_ws/data/kittiMOT",
+                "/home/apera/mhmd/kittiMOT/data_kittiMOT",
                 "--testing",
                 "0",
                 "--yolo-weights",

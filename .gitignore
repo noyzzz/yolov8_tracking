@@ -6,6 +6,7 @@ __pycache__/
 # experiment results
 bags/
 runs/
+runs_old/
 videos/
 weights
 

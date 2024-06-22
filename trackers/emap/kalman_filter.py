@@ -28,9 +28,9 @@ class KalmanFilter(object):
     """
     A simple Kalman filter for tracking bounding boxes in image space.
 
-    The 8-dimensional state space
+    The 10-dimensional state space
 
-        x, y, a, h, vx, vy, va, vh
+        x, y, a, h, d vx, vy, va, vh, vd
 
     contains the bounding box center position (x, y), aspect ratio a, height h,
     and their respective velocities.
@@ -47,7 +47,7 @@ class KalmanFilter(object):
             for key in param_keys:
                 setattr(self, key, params_dict[key])
         self.image_width, self.image_height, self.focal_length = image_width, image_height, focal_length
-        self.ndim, self.dt = 4, 1.
+        self.ndim, self.dt = 5, 1.
 
         # Create Kalman filter model matrices.
         #_motion_mat is the base matrix, should not be directly used in the equations
@@ -65,7 +65,7 @@ class KalmanFilter(object):
         self._q1 = 1./20
         self._q4 = 1./160
         self._r1 = 1/20
-
+        self._d_std = 1/80
 
         self._r4 = 1./160 #to initiate P matrix ONLY
 
@@ -81,7 +81,7 @@ class KalmanFilter(object):
         # return self._motion_mat\
         return self._motion_mat
 
-    def calculate_control_mat(self, mean):
+    def calculate_yaw_control_mat(self, mean):
         u1 = mean[0] - self.image_width/2
         robot_yaw_to_pixel_coeff = (u1**2/self.focal_length**2 + 1)*self.focal_length
         self.control_mat[0, 0] = robot_yaw_to_pixel_coeff*self.dt
@@ -96,11 +96,13 @@ class KalmanFilter(object):
         u_coeff = u1*np.sqrt(u1**2 + self.focal_length**2)/(self.focal_length * control_signal[2])
         v_coeff = v1*np.sqrt(v1**2 + self.focal_length**2)/(self.focal_length * control_signal[2])
         h_coeff = (bottom_y*np.sqrt(bottom_y**2 + self.focal_length**2) - v1*np.sqrt(v1**2 + self.focal_length**2))\
-                   /(self.focal_length * control_signal[2])
+                   /(self.focal_length * control_signal[2])  #FIXME: this is wrong; v1 is not the top left corner
+        depth_coeff = -1 * np.sqrt(self.focal_length**2/(u1**2 + self.focal_length**2))
         depth_control_mat = np.zeros((2 * self.ndim, 1))
         depth_control_mat[0, 0] = u_coeff
         depth_control_mat[1, 0] = v_coeff
         depth_control_mat[3, 0] = h_coeff
+        depth_control_mat[4, 0] = depth_coeff
         return depth_control_mat
 
 
@@ -110,8 +112,8 @@ class KalmanFilter(object):
         Parameters
         ----------
         measurement : ndarray
-            Bounding box coordinates (x, y, a, h, psi) with center position (x, y),
-            aspect ratio a, and height h.
+            Bounding box coordinates (x, y, a, h, d) with center position (x, y),
+            aspect ratio a, and height h, depth d
 
         Returns
         -------
@@ -130,25 +132,28 @@ class KalmanFilter(object):
             self._r1  * measurement[3],
             1e-2,
             self._r1  * measurement[3],
+            self._d_std * measurement[4],  
+            
             self._r4  * measurement[3],
             self._r4  * measurement[3],
             1e-5,
-            self._r4  * measurement[3]
+            self._r4  * measurement[3],
+            self._r4 * measurement[4]
             ]
         
         covariance = np.diag(np.square(std))*10
         return mean, covariance
 
-    def predict(self, mean, covariance, input_signal):
+    # def predict(self, mean, covariance, input_signal):
         """Run Kalman filter prediction step.
 
         Parameters
         ----------
         mean : ndarray
-            The 8 dimensional mean vector of the object state at the previous
+            The 10 dimensional mean vector of the object state at the previous
             time step.
         covariance : ndarray
-            The 8x8 dimensional covariance matrix of the object state at the
+            The 10x10 dimensional covariance matrix of the object state at the
             previous time step.
         input_signal : ndarray
             The 1 dimensional control signal vector that contains the robot's
@@ -166,19 +171,20 @@ class KalmanFilter(object):
             self._q1 * mean[3],
             self._q1 * mean[3] ,
             1e-2,
-            self._q1 * mean[3]] 
+            self._q1 * mean[3],
+            self._d_std * mean[4]] 
         std_vel = [
             self._q4* mean[3] ,
             self._q4 * mean[3],
             1e-5,
-            self._q4 * mean[3]]
+            self._q4 * mean[3],
+            self._q4 * mean[4]]
                 
         motion_cov = np.diag(np.square(np.r_[std_pos, std_vel]))
 
-        #mean = np.dot(self._motion_mat, mean)
         # predict new state: x_pred = F * x + B * u
         this_motion_mat = self.calculate_motion_mat(mean) # F matrix
-        this_control_mat = self.calculate_control_mat(mean) # B matrix
+        this_control_mat = self.calculate_yaw_control_mat(mean) # B matrix
         mean = np.dot(mean, this_motion_mat.T) + np.dot(input_signal, this_control_mat.T)
         # predict new covariance: P_pred = F * P * F.T + Q
         covariance = np.linalg.multi_dot((
@@ -219,7 +225,9 @@ class KalmanFilter(object):
             self._r1 * mean[3],
             self._r1 * mean[3],
             1e-1,
-            self._r1 * mean[3]]
+            self._r1 * mean[3],
+            self._d_std * mean[3]]
+        
         innovation_cov = np.diag(np.square(std))
 
         # mean = H * x_hat 
@@ -234,53 +242,52 @@ class KalmanFilter(object):
         Parameters
         ----------
         mean : ndarray
-            The 8 dimensional mean matrix of the object states at the previous
+            The 10 dimensional mean matrix of the object states at the previous
             time step.
         covariance : ndarray
-            The Nx8x8 dimensional covariance matrics of the object states at the
+            The Nx10x10 dimensional covariance matrics of the object states at the
             previous time step.
         control_signal : ndarray
-            The Nx3 dimensional control signal vector that contains the robot's
-            yaw velocity, forward tranlational velocity and distance to the objects.
+            The Nx2 dimensional control signal vector that contains the robot's
+            yaw velocity, forward tranlational velocity.
         Returns
         -------
         (ndarray, ndarray)
             Returns the mean vector and covariance matrix of the predicted
             state. Unobserved velocities are initialized to 0 mean.
         """
-        use_control_signal = True
+        use_control_signal = False
         #define x_dis_to_end, y_dis_to_end, x_dis_to_start, y_dis_to_start
-        x_dis_to_end = np.abs(self.image_width - mean[:, 0])
-        x_dis_to_start = np.abs(mean[:, 0])
+        # x_dis_to_end = np.abs(self.image_width - mean[:, 0])
+        # x_dis_to_start = np.abs(mean[:, 0])
         #for each track find the maximum distance to the end of the image
-        x_dis_min = np.minimum(x_dis_to_end, x_dis_to_start)*10.0/self.image_width
+        # x_dis_min = np.minimum(x_dis_to_end, x_dis_to_start)*10.0/self.image_width
 
 
         std_pos = [
             self._q1 * (mean[:, 3]),
             self._q1 * (mean[:, 3]) ,
             1e-2 * (mean[:, 3]),
-            self._q1 * (mean[:, 3])]
+            self._q1 * (mean[:, 3]),
+            self._d_std * (mean[:, 3])*500]
         std_vel = [
             self._q4 * (mean[:, 3]) ,
             self._q4 * (mean[:, 3]) ,
             1e-5 * (mean[:, 3]),
-            self._q4 * (mean[:, 3])]
+            self._q4 * (mean[:, 3]),
+            self._q4 * (mean[:, 3])*500]
         
         sqr = np.square(np.r_[std_pos, std_vel]).T
         
         for i in range(len(mean)):
             this_motion_cov = np.diag(sqr[i])
             this_motion_mat = self.calculate_motion_mat(mean[i])
-            this_control_mat = self.calculate_control_mat(mean[i])
-            mean_rot_applied = np.dot(control_signal[i][0], this_control_mat.T)[0]
+            yaw_control_mat = self.calculate_yaw_control_mat(mean[i])                
+            mean_rot_applied = np.dot(control_signal[i][0], yaw_control_mat.T)[0]
             depth_control_mat = self.calculate_depth_control_mat(mean[i], control_signal[i])
             mean_trans_applied = np.dot(control_signal[i][1], depth_control_mat.T)[0]
             if use_control_signal:
                 mean[i] = np.dot(mean[i], this_motion_mat.T) + mean_rot_applied + mean_trans_applied
-                # if np.sum(mean_rot_applied) > 20 or np.sum(mean_trans_applied) > 20:
-                # print("mean_rot_applied: ", mean_rot_applied[0])
-                # print("mean_trans_applied", mean_trans_applied[0:7].reshape(7,1))
                 covariance[i] = np.linalg.multi_dot((
                     this_motion_mat, covariance[i], this_motion_mat.T)) + this_motion_cov
             else:
@@ -296,15 +303,16 @@ class KalmanFilter(object):
         Parameters
         ----------
         mean : ndarray
-            The predicted state's mean vector (8 dimensional).
+            The predicted state's mean vector (10 dimensional).
         covariance : ndarray
-            The state's covariance matrix (8x8 dimensional).
+            The state's covariance matrix (10x10 dimensional).
         measurement : ndarray
-            The 5 dimensional measurement vector (x, y, a, h, psi), where (x, y)
+            The 5 dimensional measurement vector (x, y, a, h, d), where (x, y)
             is the center position, a the aspect ratio, and h the height of the
             bounding box.
         measurement_mask : ndarray
             A 5 dimensional boolean mask indicating whether the measurement is available for each element in the measurement vector.
+            [x, y, a, h, d]
 
         Returns
         -------
@@ -347,8 +355,8 @@ class KalmanFilter(object):
         return mean, covariance
 
 
-    def gating_distance(self, mean, covariance, measurements,
-                        only_position=False, metric='maha'):
+    # def gating_distance(self, mean, covariance, measurements,
+    #                     only_position=False, metric='maha'):
         """Compute gating distance between state distribution and measurements.
         A suitable distance threshold can be obtained from `chi2inv95`. If
         `only_position` is False, the chi-square distribution has 4 degrees of

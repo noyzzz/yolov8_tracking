@@ -307,7 +307,7 @@ def run(
         kitti_loader_base_path = Path(source) / ("testing" if testing else "training")
         kitti_loader_base_path = str(kitti_loader_base_path)
         # kitti_loader_base_path = 
-        dataset = KittiLoaderVODP(
+        dataset = KittiLoader(
             kitti_loader_base_path,
             sequence=kitti_seq,
             imgsz=imgsz,
