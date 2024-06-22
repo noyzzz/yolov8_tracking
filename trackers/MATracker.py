@@ -65,11 +65,40 @@ class MATrack (ABC):
         if self.bb_depth < 0:
             raise Exception("bb_depth is negative")
         return self.bb_depth
+    
+    def get_d1_noise(self):
+        if MATrack.current_depth_image_std is not None:
+            bounding_box = copy.deepcopy(self.get_tlwh())
+            #get the depth of the bounding box in the depth image
+            #clip the bounding box to the image size and remove the negative values
+            bounding_box[bounding_box < 0] = 0
+            bounding_box[np.isnan(bounding_box)] = 0
+            #if any of the bounding values is inf then set it to zero
+            # bounding_box[np.isinf(bounding_box)] = 0
+            track_depth_std = copy.deepcopy(MATrack.current_depth_image_std)[int(bounding_box[1]):int(bounding_box[1]+bounding_box[3]), int(bounding_box[0]):int(bounding_box[0]+bounding_box[2])]
+            #get the median of the depth values in the bounding box excluding the zeros and the nans
+            track_depth_std = track_depth_std[track_depth_std != 0]
+            track_depth_std = track_depth_std[~np.isnan(track_depth_std)]
+            if len(track_depth_std) == 0:
+                return None
+            self.bb_depth_noise = np.median(track_depth_std)
+            if self.bb_depth_noise < 0:
+                raise Exception("bb_depth_std is negative")
+        else:
+            self.bb_depth_noise = None
+            
+        return self.bb_depth_noise
 
     def update_depth_image(depth_image):
         if type(depth_image) is dict and depth_image["header"] == "kitti":
             this_depth_image = depth_image["depth_image"]
             MATrack.current_depth_image = this_depth_image
+            # check if depth_image has depth_image_std key
+            if "depth_image_std" in depth_image:
+                this_depth_image_std = depth_image["depth_image_std"]
+                MATrack.current_depth_image_std = this_depth_image_std
+            else:
+                MATrack.current_depth_image_std = None
             return
         #convert depth image type to float32
         depth_image = depth_image.astype(np.float32)
@@ -122,6 +151,7 @@ class MATrack (ABC):
 
     def __init__(self):
         self.bb_depth = None
+        self.bb_depth_noise = None
 
     @abstractmethod
     def get_tlwh(self):

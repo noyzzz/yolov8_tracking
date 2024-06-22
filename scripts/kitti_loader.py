@@ -95,6 +95,7 @@ class KittiLoader:
         self.seq_dets = None #is used to load dets sequence from file
         self.seq_gt = None #is used to load gt sequence from file
         self._load_dets() # it loads all the det data for a sequence. not an effiecient way to load dets data
+        self._load_conformity_score()
         if not ("testing" in self.base_path):
             self._load_gt() # it loads all the gt data for a sequence. not an effiecient way to load gt data
 
@@ -256,6 +257,11 @@ class KittiLoader:
                 # else:
                 seq_trks = np.concatenate([seq_trks, trk], axis=0)
         self.seq_dets = seq_trks
+
+    def _load_conformity_score(self):
+        self.conformity_scores = np.load(os.path.join(self.base_path,
+                                    'depth',
+                                    "conforimity_scores.npy"))
 
     def retrieve_cat_ids(self, cat):
         if cat == "Pedestrian":
@@ -440,6 +446,9 @@ class KittiLoaderVODP(KittiLoader):
         if self.kwargs.get("depth_image", False):
             pred_disp = np.load(self.depth_files[frame_index].strip())
             depthmap = 1 / pred_disp
+            # depthmap_uncert = np.load(os.path.join(self.base_path,
+            #                         'depth',
+            #                         "uncertainty.npy"))
 
         else:
             depthmap = None

@@ -186,6 +186,8 @@ def get_intersection(bbox, image_bbox):
     intersection = (x2 - x1) * (y2 - y1)
     return intersection
 
+def compute_depth_uncertainty(conformity_scores):
+    pass #TODO: copy the code from monodepth_cp implementation
 
 @torch.no_grad()
 def run(
@@ -307,7 +309,7 @@ def run(
         kitti_loader_base_path = Path(source) / ("testing" if testing else "training")
         kitti_loader_base_path = str(kitti_loader_base_path)
         # kitti_loader_base_path = 
-        dataset = KittiLoader(
+        dataset = KittiLoaderVODP(
             kitti_loader_base_path,
             sequence=kitti_seq,
             imgsz=imgsz,
@@ -316,6 +318,7 @@ def run(
             transforms=getattr(model.model, "transforms", None),
             depth_image=True if use_depth else False,
         )
+        depth_image_std = compute_depth_uncertainty(dataset.conformity_scores)
     else:
         dataset = LoadImages(
             source,
@@ -578,6 +581,7 @@ def run(
                         depth_dict = dict()
                         depth_dict["header"] = "kitti"
                         depth_dict["depth_image"] = dataset.extra_output["depth_image"]
+                        depth_dict["depth_image_std"] = depth_image_std
                         if testing or op_mode != "yolo":
                             dets_from_kitti = dataset.extra_output["dets"]
                             #convert the dets_from_kitti to a torch tensor

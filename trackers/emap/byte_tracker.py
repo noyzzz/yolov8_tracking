@@ -81,9 +81,10 @@ class STrack(BaseTrack, MATrack):
 
     def re_activate(self, new_track, frame_id, new_id=False): 
         #initialize the measurement mask to all trues with size 5
+        depth_measurement_noise_std = np.array([None, None, None, None, self.get_d1_noise()])    
 
         self.mean, self.covariance = self.kalman_filter.update(
-            self.mean, self.covariance, np.append(self.tlwh_to_xyah(self._tlwh), self.get_d1()))
+            self.mean, self.covariance, np.append(self.tlwh_to_xyah(self._tlwh), self.get_d1()), depth_measurement_noise_std)
         self.tracklet_len = 0
         self.state = TrackState.Tracked
         self.is_activated = True
@@ -105,10 +106,11 @@ class STrack(BaseTrack, MATrack):
         self.frame_id = frame_id
         self.tracklet_len += 1
         # self.cls = cls
-        measurement = np.append(self.tlwh_to_xyah(new_track.tlwh), self.get_d1())    
+        measurement = np.append(self.tlwh_to_xyah(new_track.tlwh), self.get_d1())
+        depth_measurement_noise_std = np.array([None, None, None, None, self.get_d1_noise()])    
         
         self.mean, self.covariance = self.kalman_filter.update(
-            self.mean, self.covariance, measurement)
+            self.mean, self.covariance, measurement, depth_measurement_noise_std)
         self.mean_history.append(self.mean)
         if new_track is not None:
             self.state = TrackState.Tracked
