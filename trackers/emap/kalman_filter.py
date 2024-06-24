@@ -1,6 +1,7 @@
 # vim: expandtab:ts=4:sw=4
 import numpy as np
 import scipy.linalg
+from ..KF_meta import KFMeta
 
 
 """
@@ -24,7 +25,7 @@ chi2inv95 = {
     9: 16.919}
 
 
-class KalmanFilter(object):
+class KalmanFilter(KFMeta):
     """
     A simple Kalman filter for tracking bounding boxes in image space.
 
