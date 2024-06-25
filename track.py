@@ -942,7 +942,7 @@ def run(
             LOGGER.error(stdout)
             sys.exit(1)
 
-        # LOGGER.info(stdout)
+        LOGGER.info(stdout)
     print("checksum ", check_sum)
     if not testing:
         return stdout
