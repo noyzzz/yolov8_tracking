@@ -27,7 +27,7 @@ class STrack(BaseTrack, MATrack):
         MATrack.__init__(self)
         # wait activate
         self._tlwh = np.asarray(tlwh, dtype=np.float32)
-        self.kalman_filter = None
+        self.kalman_filter:KalmanFilter = None
         self.mean, self.covariance = None, None
         self.is_activated = False
 
@@ -64,7 +64,7 @@ class STrack(BaseTrack, MATrack):
                 stracks[i].mean = mean
                 stracks[i].covariance = cov
 
-    def activate(self, kalman_filter, frame_id):
+    def activate(self, kalman_filter:KalmanFilter, frame_id):
         """Start a new tracklet"""
         self.kalman_filter = kalman_filter
         self.track_id = self.next_id()

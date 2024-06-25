@@ -2,6 +2,7 @@
 import numpy as np
 import scipy.linalg
 from abc import ABC, abstractmethod
+from std_msgs.msg import Float32MultiArray
 
 class KFMeta(ABC):
     """
@@ -123,7 +124,7 @@ class KFMeta(ABC):
         covariance = np.diag(np.square(std))*10
         return mean, covariance
 
-    # def predict(self, mean, covariance, input_signal):
+    def predict(self, mean, covariance, input_signal):
         """Run Kalman filter prediction step.
 
         Parameters

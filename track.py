@@ -14,6 +14,8 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from scripts.kitti_loader import KittiLoader, KittiLoaderVODP
 from unit_tests.kitti_tests import test_kitti_odom, test_kitti_depth
+import numpy.ma as ma
+import scipy.stats
 # sys.path.append("/home/rosen/tracking_catkin_ws/src/my_tracker")
 print(sys.path)
 # from my_tracker.msg import ImageDetectionMessage
@@ -186,8 +188,12 @@ def get_intersection(bbox, image_bbox):
     intersection = (x2 - x1) * (y2 - y1)
     return intersection
 
-def compute_depth_uncertainty(conformity_scores):
-    pass #TODO: copy the code from monodepth_cp implementation
+def compute_depth_uncertainty(nonconformity_scores, epsilon=0.05):
+    # Calculate the quantile of the nonconformity scores for each pixel
+    masked_nonconformity_scores = ma.masked_equal(nonconformity_scores, 0)
+    pixelwise_std = np.std(masked_nonconformity_scores, axis=0)  # Standard deviation at each pixel
+    z_score = scipy.stats.norm.ppf(1 - epsilon / 2)
+    return z_score * pixelwise_std
 
 @torch.no_grad()
 def run(
@@ -318,7 +324,7 @@ def run(
             transforms=getattr(model.model, "transforms", None),
             depth_image=True if use_depth else False,
         )
-        depth_image_std = compute_depth_uncertainty(dataset.conformity_scores)
+        depth_image_std = compute_depth_uncertainty(dataset.conformity_scores, epsilon=0.05)
     else:
         dataset = LoadImages(
             source,

@@ -436,7 +436,7 @@ class KittiLoaderVODP(KittiLoader):
     def _load_conformity_score(self):
         self.conformity_scores = np.load(os.path.join(self.base_path,
                                     'depth',
-                                    "conforimity_scores.npy"))
+                                    "normal_nonconformity_scores.npy"))
         
     def __getitem__(self, frame_index):
         """Return the data from a particular frame_index."""
