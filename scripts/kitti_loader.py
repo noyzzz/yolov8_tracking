@@ -368,7 +368,9 @@ class KittiLoaderVODP(KittiLoader):
         super(KittiLoaderVODP, self).__init__(kitii_base_path, sequence, imgsz, stride, auto, transforms, **kwargs)
         self._load_dets()
         self._load_gt()
-        self._load_conformity_score()
+        # self._load_conformity_score()
+        self._load_uncertainty()
+
     def _get_file_lists(self):
         """Find and list data files for each sensor."""
         self.cam2_files = sorted(glob.glob(
@@ -433,10 +435,15 @@ class KittiLoaderVODP(KittiLoader):
 
         self._calib = namedtuple('CalibData', data.keys())(*data.values())
     
-    def _load_conformity_score(self):
-        self.conformity_scores = np.load(os.path.join(self.base_path,
+    # def _load_conformity_score(self):
+    #     self.conformity_scores = np.load(os.path.join(self.base_path,
+    #                                 'depth',
+    #                                 "normal_nonconformity_scores.npy"))
+    
+    def _load_uncertainty(self):
+        self._uncertainty_std = np.load(os.path.join(self.base_path,
                                     'depth',
-                                    "normal_nonconformity_scores.npy"))
+                                    "uncertainty_std_nan_filled.npy"))
         
     def __getitem__(self, frame_index):
         """Return the data from a particular frame_index."""
@@ -477,7 +484,7 @@ class KittiLoaderVODP(KittiLoader):
             cam2 = np.ascontiguousarray(cam2)  # contiguous
         
         
-        self.extra_output = {"depth_image": depthmap, "velodyne": None, "oxt": oxt, "dets": dets, "gt": gt}
+        self.extra_output = {"depth_image": depthmap, "depth_image_uncertainty": self._uncertainty_std, "velodyne": None, "oxt": oxt, "dets": dets, "gt": gt}
 
         return self.base_path, cam2, [cam2_0], None, "", self.extra_output
     

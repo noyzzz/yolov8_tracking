@@ -324,7 +324,7 @@ def run(
             transforms=getattr(model.model, "transforms", None),
             depth_image=True if use_depth else False,
         )
-        depth_image_std = compute_depth_uncertainty(dataset.conformity_scores, epsilon=0.05)
+        # depth_image_std = compute_depth_uncertainty(dataset.conformity_scores, epsilon=0.05)
     else:
         dataset = LoadImages(
             source,
@@ -587,7 +587,7 @@ def run(
                         depth_dict = dict()
                         depth_dict["header"] = "kitti"
                         depth_dict["depth_image"] = dataset.extra_output["depth_image"]
-                        depth_dict["depth_image_std"] = depth_image_std
+                        depth_dict["depth_image_std"] = dataset.extra_output["depth_image_uncertainty"]
                         if testing or op_mode != "yolo":
                             dets_from_kitti = dataset.extra_output["dets"]
                             #convert the dets_from_kitti to a torch tensor
