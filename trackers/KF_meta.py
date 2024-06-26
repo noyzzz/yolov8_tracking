@@ -45,7 +45,7 @@ class KFMeta(ABC):
         self._q1 = 1./20
         self._q4 = 1./160
         self._r1 = 1/20
-        self._d_std = 1/80
+        self._d_std = 1/1000
 
         self._r4 = 1./160 #to initiate P matrix ONLY
 
@@ -206,12 +206,15 @@ class KFMeta(ABC):
                 self._r1 * mean[3],
                 1e-1,
                 self._r1 * mean[3],
-                self._d_std * mean[3]]
+                self._d_std * mean[4]]
         
-        if meas_noise_std is not None:
-            for i in range(len(meas_noise_std)):
-                if meas_noise_std[i] is not None:
-                    std[i] = meas_noise_std[i]
+        # if meas_noise_std is not None:
+        #     for i in range(len(meas_noise_std)):
+        #         if meas_noise_std[i] is not None:
+        #             std[i] = meas_noise_std[i]
+        for i in range(len(std)):
+            if meas_noise_std[4] is not None:
+                std[i] = std[i]* meas_noise_std[4]
         
         innovation_cov = np.diag(np.square(std))
 
@@ -254,13 +257,13 @@ class KFMeta(ABC):
             self._q1 * (mean[:, 3]) ,
             1e-2 * (mean[:, 3]),
             self._q1 * (mean[:, 3]),
-            self._d_std * (mean[:, 3])*500]
+            self._d_std * (mean[:, 3])*100]
         std_vel = [
             self._q4 * (mean[:, 3]) ,
             self._q4 * (mean[:, 3]) ,
             1e-5 * (mean[:, 3]),
             self._q4 * (mean[:, 3]),
-            self._q4 * (mean[:, 3])*500]
+            self._q4 * (mean[:, 3])*100]
         
         sqr = np.square(np.r_[std_pos, std_vel]).T
         
