@@ -342,13 +342,13 @@ class KalmanFilterNew(object):
         self.dt = 1
         self.control_mat = np.zeros((7, 1))
 
-    def calculate_control_mat(self, mean):
+    def calculate_control_mat(self, mean): #TODO: why is it different form byte track
         u1 = mean[0] - self.image_width/2
         robot_yaw_to_pixel_coeff = (u1**2/self.focal_length**2 + 1)*self.focal_length
         self.control_mat[0, 0] = robot_yaw_to_pixel_coeff*self.dt
         return self.control_mat
     
-    def calculate_depth_control_mat(self, mean, control_signal):
+    def calculate_depth_control_mat(self, mean, control_signal): #TODO: modify this to be similar to byte track
         if control_signal[2] == 0:
             return np.zeros((7, 1))
         u1 = mean[0] - self.image_width/2
