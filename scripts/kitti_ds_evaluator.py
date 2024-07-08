@@ -3,8 +3,8 @@ def run_track_script():
     sys.path.append("./")
     from track import parse_opt, main
     opt = parse_opt()
-    for i in range(0, 21):
-        for tracker_type in ['ocsort', 'deepocsort', 'emap', "bytetrack", 'botsort' ]:
+    for i in range(13, 14):
+        for tracker_type in [ 'emap', "bytetrack"]:
             for j in range(0, 2):
                 if j == 0:
                     use_depth = False

@@ -13,7 +13,7 @@ def generate_res_tables(res_folder_name):
     import re
     #get the list of folders in res_folder_name
     folder_list = os.listdir(res_folder_name)
-    tracker_type_list = ["ocsort", "deepocsort", "emap", "bytetrack", "botsort"]
+    tracker_type_list = [ "emap", "bytetrack"]
     depth_use_list = ["no_depth", "emap"]
     #create a dictionary with a pair as key which is (tracker_type, depth_use) and the value is a list of the evaluation results
     eval_dict = {}
@@ -48,9 +48,13 @@ def generate_res_tables(res_folder_name):
             #get index of each metric
             metrics_to_select = ["HOTA", "MOTA", "IDF1","IDFP", "IDFN", "IDSW","Frag","AssA", "AssRe"]
             selected_metric_values = []
+            # print the sequence number tracker type and depth use all in one line
+            print(f"{seq_num:4} {tracker_type:10} {depth_use:8}", end=": ")
             for metric in metrics_to_select:
                 index = metrics.index(metric)
                 selected_metric_values.append(eval_res[index])
+                print(f"{(round(eval_res[index],2)):^7}", end="& ")
+            print()
             eval_dict[(tracker_type, depth_use)][seq_num] = selected_metric_values
     #in eval_dict sort the values of each key by the sequence number
     for key in eval_dict:
@@ -123,4 +127,4 @@ def generate_res_tables(res_folder_name):
 
 
 if __name__ == "__main__":
-    generate_res_tables("runs/mot_perma")
+    generate_res_tables("runs/mot_eval")

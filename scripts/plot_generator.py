@@ -17,7 +17,7 @@ def generate_plots(res_folder_name):
 
     #get the list of folders in res_folder_name
     folder_list = os.listdir(res_folder_name)
-    tracker_type_list = ["ocsort", "deepocsort", "emap", "bytetrack", "botsort"]
+    tracker_type_list = ["ocsort", "bytetrack"]
     depth_use_list = ["no_depth", "emap"]
     #create a dictionary with a pair as key which is (tracker_type, depth_use) and the value is a list of the evaluation results
     eval_dict = {}
@@ -70,7 +70,7 @@ def generate_plots(res_folder_name):
         for _seq, _results in eval_dict[key].items():
             _tracker_name = f"{key[0]}_{key[1]}"
             df_tracker_list.append(key[0])
-            _emap = "w/ EMAP" if key[1]=="emap" else "w/o EMAP"
+            _emap = "w/ UVEMAP" if key[1]=="emap" else "w/o UVEMAP"
             df_used_emap.append(_emap)
             df_seq_list.append(_seq)
             df_hota_list.append(_results[metrics_to_select.index("HOTA")])
@@ -82,48 +82,47 @@ def generate_plots(res_folder_name):
               idsw=df_idsw_list, idf1=df_idf1_list, mota=df_mota_list)
     hrdf = pd.DataFrame(data=df)
 
-    custom_pallete = {"w/ EMAP": "#66c2a5", "w/o EMAP": "#fc8d62"}
+    custom_pallete = {"w/ UVEMAP": "#66c2a5", "w/o UVEMAP": "#fc8d62"}
     sns.set_style("whitegrid")
     order_trk = ["ocsort", "deepocsort", "bytetrack", "botsort"]
     
     
     #----------------------------START of bar/box plot for idsw and hota--------------------------------
-    # labels = ['OC-SORT', 'Deep OC-SORT', 'ByteTrack', 'BoT-SORT']
-
+    labels =  ['ByteTrack']
     
-    # plt.figure()
-    # plt.grid(True, linestyle='--', zorder=0)
-    # order_trk = ["ocsort", "deepocsort", "bytetrack", "botsort"]
-    # idsw_plt = sns.barplot(data=hrdf, x="tracker", y="idsw", hue="emap", order=order_trk,
-    #                   palette=custom_pallete, edgecolor=".3", capsize=0.1, err_kws={"linewidth": 1})#,whis=(0, 100))
-    # # bar = sns.violinplot(data=hrdf, x="tracker", y="idsw", hue="emap", order=sorted(set(df["tracker"])), cut=0, inner="quart")
-    # idsw_plt.set_xlabel("Tracker", fontsize=12)
-    # idsw_plt.set_ylabel("IDSW", fontsize=12)
-    # idsw_plt.legend(title='', fontsize=11)
-    # # change the name on the x axis to new names
-    # idsw_plt.set_xticklabels(labels, fontsize=11)
-    # plt.tight_layout() 
-    # plt.savefig("test_results/idsw.svg", dpi=300, format="svg")
+    plt.figure()
+    plt.grid(True, linestyle='--', zorder=0)
+    order_trk =  ["bytetrack"]
+    idsw_plt = sns.barplot(data=hrdf, x="tracker", y="idsw", hue="emap", order=order_trk,
+                      palette=custom_pallete, edgecolor=".3", capsize=0.1)#, err_kws={"linewidth": 1})#,whis=(0, 100))
+    # bar = sns.violinplot(data=hrdf, x="tracker", y="idsw", hue="emap", order=sorted(set(df["tracker"])), cut=0, inner="quart")
+    idsw_plt.set_xlabel("Tracker", fontsize=12)
+    idsw_plt.set_ylabel("IDSW", fontsize=12)
+    idsw_plt.legend(title='', fontsize=11)
+    # change the name on the x axis to new names
+    idsw_plt.set_xticklabels(labels, fontsize=11)
+    plt.tight_layout() 
+    plt.savefig("test_results/idsw.svg", dpi=300, format="svg")
 
-    # plt.figure()
-    # sns.set_style("whitegrid")
-    # plt.grid(True, linestyle='--', zorder=0)
-    # hota_plt = sns.boxplot(data=hrdf, x="tracker", y="hota", hue="emap", order=order_trk, 
-    #                        palette=custom_pallete,whis=(0, 100), showmeans=True,
-    #                        meanprops={'marker':'o',
-    #                                 'markerfacecolor':'white', 
-    #                                 'markeredgecolor':'#636363',
-    #                                 'markersize':'6'})
-    # # hota_plt = sns.violinplot(data=hrdf, x="tracker", y="hota", hue="emap", order=sorted(set(df["tracker"])),
-    # #                          palette=custom_pallete, cut=1, native_scale=True)
-    # # inner="quart", cut=0,
-    # hota_plt.set_xlabel("Tracker", fontsize=12)
-    # hota_plt.set_ylabel("HOTA", fontsize=12)
-    # hota_plt.legend(title='', fontsize=11)
-    # # plt.xticks(rotation=45)
-    # hota_plt.set_xticklabels(labels, fontsize=11)
-    # plt.tight_layout()
-    # plt.savefig("test_results/hota.svg", dpi=300, format="svg")
+    plt.figure()
+    sns.set_style("whitegrid")
+    plt.grid(True, linestyle='--', zorder=0)
+    hota_plt = sns.boxplot(data=hrdf, x="tracker", y="hota", hue="emap", order=order_trk, 
+                           palette=custom_pallete,whis=(0, 100), showmeans=True,
+                           meanprops={'marker':'o',
+                                    'markerfacecolor':'white', 
+                                    'markeredgecolor':'#636363',
+                                    'markersize':'6'})
+    # hota_plt = sns.violinplot(data=hrdf, x="tracker", y="hota", hue="emap", order=sorted(set(df["tracker"])),
+    #                          palette=custom_pallete, cut=1, native_scale=True)
+    # inner="quart", cut=0,
+    hota_plt.set_xlabel("Tracker", fontsize=12)
+    hota_plt.set_ylabel("HOTA", fontsize=12)
+    hota_plt.legend(title='', fontsize=11)
+    # plt.xticks(rotation=45)
+    hota_plt.set_xticklabels(labels, fontsize=11)
+    plt.tight_layout()
+    plt.savefig("test_results/hota.svg", dpi=300, format="svg")
     
     
     #----------------------------END of bar/box plot for idsw and hota--------------------------------
@@ -211,41 +210,41 @@ def generate_plots(res_folder_name):
     
     
     # ----------------------------START of box plot for mota and idf1--------------------------------
-    plt.figure()
-    sns.set_style("whitegrid")
-    plt.grid(True, linestyle='--', zorder=0)
-    mota_plt = sns.boxplot(data=hrdf, x="tracker", y="mota", hue="emap" ,order=order_trk,
-                           palette=custom_pallete,whis=(0, 100), showmeans=True,
-                           meanprops={'marker':'o',
-                                    'markerfacecolor':'white', 
-                                    'markeredgecolor':'#636363',
-                                    'markersize':'6'})
-    mota_plt.set_xlabel("Tracker")
-    mota_plt.set_ylabel("MOTA")
-    mota_plt.legend(title='')
-    plt.tight_layout()
-    labels = ['OC-SORT', 'Deep OC-SORT', 'ByteTrack', 'BoT-SORT',]
-    mota_plt.set_xticklabels(labels)
+    # plt.figure()
+    # sns.set_style("whitegrid")
+    # plt.grid(True, linestyle='--', zorder=0)
+    # mota_plt = sns.boxplot(data=hrdf, x="tracker", y="mota", hue="emap" ,order=order_trk,
+    #                        palette=custom_pallete,whis=(0, 100), showmeans=True,
+    #                        meanprops={'marker':'o',
+    #                                 'markerfacecolor':'white', 
+    #                                 'markeredgecolor':'#636363',
+    #                                 'markersize':'6'})
+    # mota_plt.set_xlabel("Tracker")
+    # mota_plt.set_ylabel("MOTA")
+    # mota_plt.legend(title='')
+    # plt.tight_layout()
+    # labels = ['OC-SORT', 'Deep OC-SORT', 'ByteTrack', 'BoT-SORT',]
+    # mota_plt.set_xticklabels(labels)
 
 
-    plt.figure()
-    sns.set_style("whitegrid")
-    plt.grid(True, linestyle='--', zorder=0)
-    idf1_plt = sns.boxplot(data=hrdf, x="tracker", y="idf1", hue="emap" ,order=order_trk,
-                           palette=custom_pallete,whis=(0, 100), showmeans=True,
-                           meanprops={'marker':'o',
-                                    'markerfacecolor':'white', 
-                                    'markeredgecolor':'#636363',
-                                    'markersize':'6'})
-    idf1_plt.set_xlabel("Tracker")
-    idf1_plt.set_ylabel("IDF1")
-    idf1_plt.legend(title='')
-    idf1_plt.set_xticklabels(labels)
-    plt.tight_layout()
+    # plt.figure()
+    # sns.set_style("whitegrid")
+    # plt.grid(True, linestyle='--', zorder=0)
+    # idf1_plt = sns.boxplot(data=hrdf, x="tracker", y="idf1", hue="emap" ,order=order_trk,
+    #                        palette=custom_pallete,whis=(0, 100), showmeans=True,
+    #                        meanprops={'marker':'o',
+    #                                 'markerfacecolor':'white', 
+    #                                 'markeredgecolor':'#636363',
+    #                                 'markersize':'6'})
+    # idf1_plt.set_xlabel("Tracker")
+    # idf1_plt.set_ylabel("IDF1")
+    # idf1_plt.legend(title='')
+    # idf1_plt.set_xticklabels(labels)
+    # plt.tight_layout()
     # ----------------------------END of box plot for mota and idf1--------------------------------
     
     plt.show()
 
 if __name__ == "__main__":
 
-    generate_plots("runs/mot_perma")
+    generate_plots("runs/mot_eval")
